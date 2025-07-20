@@ -1,9 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -13,57 +7,85 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
-enum Role {
-  volunteer
-  clubAdmin
-  eventOrganizer
-  systemAdmin
-}
-
 model User {
-  id            String    @id @default(cuid())
-  firstName     String
-  lastName      String
-  email         String    @unique
-  phone         String?
-  password      String    @default("")
-  image         String    @default("")
-  role          Role      @default(volunteer)
-  isActive      Boolean   @default(true)
-  emailVerified Boolean   @default(false)
-  lastLogin     DateTime? @default(now())
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id                                                        String                @id @default(cuid())
+  email                                                     String                @unique
+  createdAt                                                 DateTime              @default(now())
+  updatedAt                                                 DateTime              @updatedAt
+  firstName                                                 String
+  lastName                                                  String
+  password                                                  String                @default("")
+  phone                                                     String?
+  emailVerified                                             Boolean               @default(false)
+  image                                                     String                @default("")
+  isActive                                                  Boolean               @default(true)
+  lastLogin                                                 DateTime?             @default(now())
+  role                                                      Role                  @default(volunteer)
+  Club_Club_createdByIdToUser                               Club[]                @relation("Club_createdByIdToUser")
+  Club_Club_userIdToUser                                    Club[]                @relation("Club_userIdToUser")
+  club_requests_club_requests_requestedByIdToUser           club_requests[]       @relation("club_requests_requestedByIdToUser")
+  club_requests_club_requests_userIdToUser                  club_requests[]       @relation("club_requests_userIdToUser")
+  event_registrations_event_registrations_userIdToUser      event_registrations[] @relation("event_registrations_userIdToUser")
+  event_registrations_event_registrations_volunteerIdToUser event_registrations[] @relation("event_registrations_volunteerIdToUser")
 }
 
 model Club {
-  id        String     @id @default(uuid())
-  name      String
-  elections Election[]
+  id                          String          @id @default(uuid())
+  name                        String
+  about                       String?
+  avenues                     String[]
+  constitution                String?
+  coverImage                  String?
+  createdAt                   DateTime        @default(now())
+  createdById                 String
+  email                       String?
+  facebook                    String?
+  founded                     DateTime?
+  googleMapURL                String?
+  headquarters                String?
+  instagram                   String?
+  isActive                    Boolean         @default(true)
+  isDeleted                   Boolean         @default(false)
+  linkedIn                    String?
+  mission                     String?
+  motto                       String?
+  phone                       String?
+  profileImage                String?
+  twitter                     String?
+  updatedAt                   DateTime
+  userId                      String?
+  values                      String[]
+  website                     String?
+  User_Club_createdByIdToUser User            @relation("Club_createdByIdToUser", fields: [createdById], references: [id])
+  User_Club_userIdToUser      User?           @relation("Club_userIdToUser", fields: [userId], references: [id])
+  elections                   Election[]
+  club_requests               club_requests?
+  events                      events[]
+  excom_members               excom_members[]
 }
 
 model Election {
   id          String        @id @default(uuid())
   clubId      String
-  club        Club          @relation(fields: [clubId], references: [id])
-  title       String
-  subtitle    String?
-  description String?
   year        Int
-  votingStart DateTime
+  createdAt   DateTime      @default(now())
+  description String?
+  subtitle    String?
+  title       String
   votingEnd   DateTime
+  votingStart DateTime
+  club        Club          @relation(fields: [clubId], references: [id])
   positions   Position[]
   tokens      VotingToken[]
-  createdAt   DateTime      @default(now())
 }
 
 model Position {
   id          String      @id @default(uuid())
   name        String
-  description String?
   electionId  String
-  election    Election    @relation(fields: [electionId], references: [id])
+  description String?
   candidates  Candidate[]
+  election    Election    @relation(fields: [electionId], references: [id])
 }
 
 model Candidate {
@@ -71,18 +93,18 @@ model Candidate {
   name       String
   image      String   @default("")
   vision     String?
-  experience String?
   positionId String
+  experience String?
   position   Position @relation(fields: [positionId], references: [id])
 }
 
 model VotingToken {
   id         String   @id @default(uuid())
   electionId String
-  election   Election @relation(fields: [electionId], references: [id])
   used       Boolean  @default(false)
-  issuedTo   String // User ID (only during pre-voting)
+  issuedTo   String
   issuedAt   DateTime @default(now())
+  election   Election @relation(fields: [electionId], references: [id])
 }
 
 model Vote {
@@ -91,4 +113,147 @@ model Vote {
   positionId  String
   candidateId String
   createdAt   DateTime @default(now())
+}
+
+model club_requests {
+  id                                     String        @id
+  clubName                               String
+  motto                                  String?
+  clubType                               ClubType
+  clubCategory                           ClubCategory
+  founded                                DateTime?
+  description                            String
+  mission                                String?
+  university                             String?
+  headquarters                           String?
+  requestedById                          String
+  designation                            String
+  idProofDocument                        String?
+  constitutionDoc                        String?
+  approvalLetter                         String?
+  clubLogo                               String?
+  requestStatus                          RequestStatus @default(pending)
+  adminComments                          String?
+  createdAt                              DateTime      @default(now())
+  updatedAt                              DateTime
+  approvedClubId                         String?       @unique
+  userId                                 String?
+  Club                                   Club?         @relation(fields: [approvedClubId], references: [id])
+  User_club_requests_requestedByIdToUser User          @relation("club_requests_requestedByIdToUser", fields: [requestedById], references: [id])
+  User_club_requests_userIdToUser        User?         @relation("club_requests_userIdToUser", fields: [userId], references: [id])
+}
+
+model event_registrations {
+  id                                         String   @id
+  eventId                                    String
+  volunteerId                                String
+  isDeleted                                  Boolean  @default(false)
+  registeredAt                               DateTime @default(now())
+  userId                                     String?
+  events                                     events   @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  User_event_registrations_userIdToUser      User?    @relation("event_registrations_userIdToUser", fields: [userId], references: [id])
+  User_event_registrations_volunteerIdToUser User     @relation("event_registrations_volunteerIdToUser", fields: [volunteerId], references: [id])
+
+  @@unique([eventId, volunteerId])
+}
+
+model events {
+  id                  String                @id
+  title               String
+  clubId              String
+  category            EventCategory         @default(other)
+  description         String?
+  startDateTime       DateTime
+  endDateTime         DateTime?
+  venue               String?
+  maxParticipants     Int?
+  isDeleted           Boolean               @default(false)
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime
+  event_registrations event_registrations[]
+  Club                Club                  @relation(fields: [clubId], references: [id], onDelete: Cascade)
+}
+
+model excom_members {
+  id             String   @id
+  clubId         String
+  name           String
+  position       String
+  about          String?
+  memberSince    DateTime
+  businessEmail  String?
+  businessMobile String?
+  isDeleted      Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime
+  Club           Club     @relation(fields: [clubId], references: [id], onDelete: Cascade)
+}
+
+model inquiries {
+  id            String       @id
+  inquirerName  String
+  email         String
+  subject       String
+  type          InquiryType  @default(general)
+  message       String
+  role          InquirerRole @default(guest)
+  isResolved    Boolean      @default(false)
+  adminResponse String?
+  createdAt     DateTime     @default(now())
+  updatedAt     DateTime
+}
+
+enum Role {
+  volunteer
+  clubAdmin
+  eventOrganizer
+  systemAdmin
+}
+
+enum ClubCategory {
+  communityBased
+  instituteBased
+}
+
+enum ClubType {
+  academic
+  sports
+  cultural
+  volunteer
+  professional
+  hobby
+  other
+}
+
+enum EventCategory {
+  workshop
+  seminar
+  competition
+  social
+  fundraising
+  meeting
+  conference
+  other
+}
+
+enum InquirerRole {
+  guest
+  volunteer
+  clubAdmin
+}
+
+enum InquiryType {
+  general
+  technicalSupport
+  partnership
+  feedback
+  other
+}
+
+enum RequestStatus {
+  pending
+  underReview
+  approved
+  rejected
+  needsMoreInfo
 }
