@@ -17,6 +17,8 @@ export default function ContactPage() {
   e.preventDefault();
   setIsSubmitting(true);
 
+
+  console.log("Form data submitted:", formData);
   try {
     const res = await fetch("/api/inquiries", {
       method: "POST",
@@ -25,6 +27,8 @@ export default function ContactPage() {
     });
 
     if (!res.ok) throw new Error("Failed to send inquiry");
+
+    console.log("Inquiry sent successfully");
 
     setIsSubmitted(true);
     setFormData({ name: "", email: "", subject: "", message: "", type: "general" });

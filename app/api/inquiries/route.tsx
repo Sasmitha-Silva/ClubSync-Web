@@ -15,8 +15,7 @@ export async function POST(req: Request) {
   try {
     const body = await req.json();
     const validated = InquirySchema.parse(body);
-
-    const inquiry = await prisma.inquiries.create({
+    const inquiry = await prisma.inquiry.create({
       data: {
         id: randomUUID(),
         inquirerName: validated.name,
