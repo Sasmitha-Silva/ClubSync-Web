@@ -20,6 +20,7 @@ import {
   CheckSquare,
   ArrowRight
 } from 'lucide-react';
+import { uploadToCloudinary } from '@/utils/uploadToCloudinary';
 
 // Interface for form values
 interface ClubVerificationFormValues {
@@ -66,7 +67,7 @@ const focusAreas = [
   { id: 'community', label: 'Community Service' },
 ];
 
-// Club types
+// --- ENUMS (should match your Prisma enums) ---
 const clubTypes = [
   { value: 'academic', label: 'Academic' },
   { value: 'sports', label: 'Sports' },
@@ -75,6 +76,11 @@ const clubTypes = [
   { value: 'professional', label: 'Professional' },
   { value: 'hobby', label: 'Hobby' },
   { value: 'other', label: 'Other' },
+];
+
+const clubCategories = [
+  { value: 'communityBased', label: 'Community-Based' },
+  { value: 'instituteBased', label: 'Institute-Based' },
 ];
 
 // Form steps configuration
@@ -87,27 +93,27 @@ const formSteps = [
   },
   {
     id: 2,
-    title: 'Contact Information',
-    icon: <User className="w-5 h-5" />,
-    description: 'Primary contact details'
+    title: 'Club Profile',
+    icon: <FileText className="w-5 h-5" />,
+    description: 'Description and mission'
   },
   {
     id: 3,
-    title: 'Documentation',
-    icon: <FileText className="w-5 h-5" />,
-    description: 'Required documents and files'
+    title: 'Organization Info',
+    icon: <User className="w-5 h-5" />,
+    description: 'Affiliation and contact details'
   },
   {
     id: 4,
-    title: 'Activities & Goals',
-    icon: <Calendar className="w-5 h-5" />,
-    description: 'Planned activities and focus areas'
+    title: 'Document Uploads',
+    icon: <CheckSquare className="w-5 h-5" />,
+    description: 'Upload required documents'
   },
   {
     id: 5,
     title: 'Agreements',
     icon: <CheckSquare className="w-5 h-5" />,
-    description: 'Terms and confirmations'
+    description: 'Confirm and agree to terms'
   }
 ];
 
@@ -181,114 +187,98 @@ const ProgressStepper = ({ currentStep, totalSteps }: { currentStep: number; tot
   );
 };
 
-// Enhanced file upload component
-const FileUpload = ({ 
-  name, 
-  label, 
-  accept, 
-  required = false,
-  setFieldValue,
-  tooltip,
-  currentStep,
-  errors,
-  touched
-}: { 
-  name: string; 
-  label: string; 
+interface FileUploadProps {
+  name: string;
+  label: string;
   accept: string;
-  required?: boolean;
   setFieldValue: (field: string, value: any) => void;
   tooltip?: string;
-  currentStep: number;
+  required?: boolean;
   errors: any;
   touched: any;
-}) => {
-  const [fileName, setFileName] = useState<string>('No file chosen');
-  const [isDragOver, setIsDragOver] = useState(false);
+  currentStep: number;
+  values: any;
+}
 
-  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+const FileUpload = ({
+  name, label, accept, setFieldValue, tooltip, required, errors, touched, currentStep, values
+}: FileUploadProps) => {
+  const [uploading, setUploading] = useState(false);
+
+  const handleFileChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files && event.target.files[0];
-    if (file) {
-      setFileName(file.name);
-      setFieldValue(name, file);
-    } else {
-      setFileName('No file chosen');
-      setFieldValue(name, null);
+    if (!file) return;
+    setUploading(true);
+    try {
+      const url = await uploadToCloudinary(file);
+      setFieldValue(name, url);
+    } catch (e) {
+      alert('Upload failed. Please try again.');
     }
+    setUploading(false);
   };
 
-  const handleDragOver = (e: React.DragEvent) => {
+  const handleDrop = async (e: React.DragEvent) => {
     e.preventDefault();
-    setIsDragOver(true);
-  };
-
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
-  };
-
-  const handleDrop = (e: React.DragEvent) => {
-    e.preventDefault();
-    setIsDragOver(false);
     const file = e.dataTransfer.files[0];
     if (file) {
-      setFileName(file.name);
-      setFieldValue(name, file);
+      setUploading(true);
+      try {
+        const url = await uploadToCloudinary(file);
+        setFieldValue(name, url);
+      } catch (e) {
+        alert('Upload failed. Please try again.');
+      }
+      setUploading(false);
     }
   };
-
-  const labelContent = tooltip ? (
-    <Tooltip content={tooltip}>
-      <span>{label} {required && <span className="text-red-500">*</span>}</span>
-    </Tooltip>
-  ) : (
-    <span>{label} {required && <span className="text-red-500">*</span>}</span>
-  );
 
   return (
     <div className="mb-6">
       <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor={name}>
-        {labelContent}
+        {tooltip ? (
+          <Tooltip content={tooltip}>
+            <span>{label} {required && <span className="text-red-500">*</span>}</span>
+          </Tooltip>
+        ) : (
+          <span>{label} {required && <span className="text-red-500">*</span>}</span>
+        )}
       </label>
-      <div 
+      <div
         className={`border-2 border-dashed rounded-lg p-6 transition-all duration-200 ${
-          isDragOver 
-            ? 'border-orange-400 bg-orange-50' 
-            : 'border-gray-300 hover:border-orange-300 hover:bg-gray-50'
+          uploading ? 'border-orange-400 bg-orange-50' : 'border-gray-300 hover:border-orange-300 hover:bg-gray-50'
         }`}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
+        onDragOver={e => { e.preventDefault(); }}
         onDrop={handleDrop}
       >
         <div className="text-center">
-          <Upload className={`mx-auto h-12 w-12 mb-4 transition-colors ${
-            isDragOver ? 'text-orange-500' : 'text-gray-400'
-          }`} />
-          <div className="flex items-center text-sm text-gray-600">
-            <label
-              htmlFor={name}
-              className="relative cursor-pointer bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-md font-medium px-4 py-2 hover:from-orange-600 hover:to-red-600 transition-all duration-200 transform hover:scale-105"
-            >
-              Choose a file
-              <input
-                id={name}
-                name={name}
-                type="file"
-                accept={accept}
-                onChange={handleFileChange}
-                className="sr-only"
-              />
-            </label>
-            <p className="pl-3 text-gray-500 font-medium">or drag and drop</p>
-          </div>
+          <Upload className={`mx-auto h-12 w-12 mb-4 ${uploading ? 'text-orange-500' : 'text-gray-400'}`} />
+          <label
+            htmlFor={name}
+            className="relative cursor-pointer bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-md font-medium px-4 py-2 hover:from-orange-600 hover:to-red-600 transition-all duration-200 transform hover:scale-105"
+          >
+            Choose a file
+            <input
+              id={name}
+              name={name}
+              type="file"
+              accept={accept}
+              onChange={handleFileChange}
+              className="sr-only"
+            />
+          </label>
+          <p className="mt-2 text-gray-500 font-medium">or drag and drop</p>
+          {uploading && <span className="text-xs text-orange-500 ml-2">Uploading...</span>}
           <p className="text-xs text-gray-500 mt-2">
-            {fileName !== 'No file chosen' ? fileName : `Accepted formats: ${accept}`}
+            {values && typeof values[name] === 'string' && values[name]
+              ? 'File uploaded!'
+              : 'No file uploaded yet.'}
           </p>
+          {errors[name] && touched[name] && (
+            <div className="mt-1 text-sm text-red-500">{errors[name]}</div>
+          )}
         </div>
       </div>
-              {currentStep === 3 && errors[name] && touched[name] && (
-          <div className="mt-1 text-sm text-red-500">{errors[name]}</div>
-        )}
     </div>
   );
 };
@@ -299,13 +289,29 @@ const onlySpecialCharsRegex = /^[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]+$/;
 const notOnlyNumbersOrSpecialChars = (msg: string) =>
   Yup.string().test('not-only-numbers-or-special', msg, value => {
     if (!value) return true; // Let required validation handle empty values
-    return !onlyNumbersRegex.test(value) && !onlySpecialCharsRegex.test(value);
+    const onlyNumbers = /^\d+$/;
+    const onlySpecial = /^[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]+$/;
+    return !onlyNumbers.test(value) && !onlySpecial.test(value);
   });
 
 const ClubVerificationSchema = Yup.object().shape({
   // Club Details
   clubName: notOnlyNumbersOrSpecialChars('Club name cannot be only numbers or special characters').required('Club name is required'),
-  clubType: Yup.string().required('Club type is required'),
+  clubType: Yup.string().oneOf(clubTypes.map(t => t.value)).required('Club type is required'),
+  clubTypeOther: Yup.string().test(
+    'clubTypeOther-required',
+    'Please specify a valid club type',
+    function (value) {
+      const { clubType } = this.parent;
+      if (clubType === 'other') {
+        if (!value) return this.createError({ message: 'Please specify your club type' });
+        const onlyNumbers = /^\d+$/;
+        const onlySpecial = /^[!@#$%^&*()_+\-=\[\]{};':"\\|,.<>\/?`~]+$/;
+        return !onlyNumbers.test(value) && !onlySpecial.test(value);
+      }
+      return true;
+    }
+  ),
   description: notOnlyNumbersOrSpecialChars('Description cannot be only numbers or special characters')
     .max(300, 'Description must be 300 characters or less')
     .required('Description is required'),
@@ -340,512 +346,411 @@ const ClubVerificationSchema = Yup.object().shape({
   agreeToTerms: Yup.boolean().oneOf([true], 'You must agree to the terms and conditions'),
 });
 
-export default function ClubVerificationPage() {
+const ClubRequestSchema = Yup.object().shape({
+  clubName: notOnlyNumbersOrSpecialChars('Club name cannot be only numbers or special characters').required('Club name is required'),
+  motto: notOnlyNumbersOrSpecialChars('Motto cannot be only numbers or special characters').required('Motto is required'),
+  clubType: Yup.string().oneOf(clubTypes.map(t => t.value)).required('Club type is required'),
+  clubTypeOther: notOnlyNumbersOrSpecialChars('Please specify a valid club type').when('clubType', {
+    is: 'other',
+    then: schema => schema.required('Please specify your club type'),
+    otherwise: schema => schema.notRequired(),
+  }),
+  clubCategory: Yup.string().oneOf(clubCategories.map(c => c.value)).required('Club category is required'),
+  founded: Yup.number()
+    .typeError('Year must be a number')
+    .integer('Year must be an integer')
+    .min(1800, 'Year must be after 1800')
+    .max(new Date().getFullYear(), `Year cannot be in the future`)
+    .required('Year of establishment is required'),
+  description: notOnlyNumbersOrSpecialChars('Description cannot be only numbers or special characters')
+    .test('max-words', 'Description must be 100 words or less', value => {
+      if (!value) return true;
+      return value.trim().split(/\s+/).filter(Boolean).length <= 100;
+    })
+    .required('Description is required'),
+  mission: notOnlyNumbersOrSpecialChars('Mission cannot be only numbers or special characters').required('Mission is required'),
+  university: notOnlyNumbersOrSpecialChars('University cannot be only numbers or special characters').required('University/Institute is required'),
+  headquarters: notOnlyNumbersOrSpecialChars('Headquarters cannot be only numbers or special characters').required('Headquarters is required'),
+  designation: notOnlyNumbersOrSpecialChars('Designation cannot be only numbers or special characters').required('Designation is required'),
+  idProofDocument: Yup.mixed().required('ID Proof Document is required'),
+  constitutionDoc: Yup.mixed().required('Club Constitution is required'),
+  approvalLetter: Yup.mixed().required('Official Approval Letter is required'),
+  clubLogo: Yup.mixed().required('Club Logo is required'),
+  isOfficialRepresentative: Yup.boolean().oneOf([true], 'You must confirm you are an official representative').required('Required'),
+  documentsVerified: Yup.boolean().oneOf([true], 'You must confirm your documents are verified').required('Required'),
+});
+
+const initialValues = {
+  clubName: '',
+  motto: '',
+  clubType: '',
+  clubTypeOther: '',
+  clubCategory: '',
+  founded: '',
+  description: '',
+  mission: '',
+  university: '',
+  headquarters: '',
+  designation: '',
+  idProofDocument: null,
+  constitutionDoc: null,
+  approvalLetter: null,
+  clubLogo: null,
+  isOfficialRepresentative: false,
+  documentsVerified: false,
+};
+
+const stepFields: { [key: number]: string[] } = {
+  1: ['clubName', 'clubType', 'clubTypeOther', 'clubCategory', 'founded'],
+  2: ['motto', 'description', 'mission'],
+  3: ['university', 'headquarters', 'designation'],
+  4: ['idProofDocument', 'constitutionDoc', 'approvalLetter', 'clubLogo'],
+  5: ['isOfficialRepresentative', 'documentsVerified'],
+};
+
+export default function ClubRequestForm() {
   const [currentStep, setCurrentStep] = useState(1);
-  const [verificationStatus, setVerificationStatus] = useState<'PENDING' | 'APPROVED' | 'REJECTED'>('PENDING');
+  const wordCount = (text: string) => text ? text.trim().split(/\s+/).filter(Boolean).length : 0;
 
-  // Map step to relevant field names for validation
-  const stepFields: { [key: number]: string[] } = {
-    1: ['clubName', 'clubType', 'description', 'affiliation', 'clubCategory'],
-    2: ['contactName', 'contactEmail', 'contactPhone', 'contactPosition', 'contactIdProof'],
-    3: ['clubConstitution', 'approvalLetter', 'meetingMinutes', 'clubLogo'],
-    4: ['upcomingEvent1', 'expectedMembers', 'focusAreas'],
-    5: ['isOfficialRepresentative', 'documentsVerified', 'agreeToTerms'],
-  };
-
-  const initialValues: ClubVerificationFormValues = {
-    clubName: '',
-    clubType: '',
-    description: '',
-    affiliation: '',
-    clubCategory: '',
-    contactName: '',
-    contactEmail: '',
-    contactPhone: '',
-    contactPosition: '',
-    contactIdProof: null,
-    clubConstitution: null,
-    approvalLetter: null,
-    meetingMinutes: null,
-    clubLogo: null,
-    upcomingEvent1: '',
-    upcomingEvent2: '',
-    expectedMembers: 0,
-    focusAreas: [],
-    isOfficialRepresentative: false,
-    documentsVerified: false,
-    agreeToTerms: false,
-  };
-
-  const handleSubmit = (
-    values: ClubVerificationFormValues,
-    { setSubmitting }: FormikHelpers<ClubVerificationFormValues>
-  ) => {
-    console.log('Form submitted with values:', values);
-    
-    // Mock submission success
-    setTimeout(() => {
-      alert('Form submitted successfully! Your club verification request is now pending approval.');
-      setSubmitting(false);
-    }, 1000);
-  };
-
-  const nextStep = () => {
-    if (currentStep < formSteps.length) {
-      setCurrentStep(currentStep + 1);
-    }
-  };
-
-  const prevStep = () => {
-    if (currentStep > 1) {
-      setCurrentStep(currentStep - 1);
-    }
-  };
-
-  const renderStepContent = (errors: any, touched: any, setFieldValue: any) => {
+  const renderStepContent = (values: any, errors: any, touched: any, setFieldValue: any) => {
     switch (currentStep) {
       case 1:
         return (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start min-h-[250px]">
+            <div>
+              <label htmlFor="clubName" className="block text-sm font-medium text-gray-700 mb-2">
+                Club Name <span className="text-red-500">*</span>
+              </label>
+              <Field
+                type="text"
+                name="clubName"
+                id="clubName"
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                  errors.clubName && touched.clubName ? 'border-red-500' : 'border-gray-300 hover:border-orange-300'
+                }`}
+                placeholder="e.g., Robotics Club"
+              />
+              {errors.clubName && touched.clubName && (
+                <div className="mt-1 text-sm text-red-500">{errors.clubName}</div>
+              )}
+            </div>
+            <div>
+              <label htmlFor="clubType" className="block text-sm font-medium text-gray-700 mb-2">
+                <Tooltip content="Select the type that best describes your club.">
+                  Club Type <span className="text-red-500">*</span>
+                </Tooltip>
+              </label>
+              <Field
+                as="select"
+                name="clubType"
+                id="clubType"
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                  errors.clubType && touched.clubType ? 'border-red-500' : 'border-gray-300 hover:border-orange-300'
+                }`}
+              >
+                <option value="">Select Club Type</option>
+                {clubTypes.map(type => (
+                  <option key={type.value} value={type.value}>{type.label}</option>
+                ))}
+              </Field>
+              {errors.clubType && touched.clubType && (
+                <div className="mt-1 text-sm text-red-500">{errors.clubType}</div>
+              )}
+            </div>
+            {values.clubType === 'other' && (
               <div>
-                <label htmlFor="clubName" className="block text-sm font-medium text-gray-700 mb-2">
-                  Club Name <span className="text-red-500">*</span>
+                <label htmlFor="clubTypeOther" className="block text-sm font-medium text-gray-700 mb-2">
+                  Please specify club type <span className="text-red-500">*</span>
                 </label>
                 <Field
                   type="text"
-                  name="clubName"
-                  id="clubName"
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all duration-200 ${
-                    errors.clubName && touched.clubName
-                      ? 'border-red-500'
-                      : 'border-gray-300 hover:border-orange-300'
+                  name="clubTypeOther"
+                  id="clubTypeOther"
+                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                    errors.clubTypeOther && touched.clubTypeOther ? 'border-red-500' : 'border-gray-300 hover:border-orange-300'
                   }`}
-                  placeholder="Enter your club name"
+                  placeholder="e.g., Debate, Astronomy, etc."
                 />
-                {currentStep === 1 && errors.clubName && touched.clubName && (
-                  <div className="mt-1 text-sm text-red-500">{errors.clubName}</div>
+                {errors.clubTypeOther && touched.clubTypeOther && (
+                  <div className="mt-1 text-sm text-red-500">{errors.clubTypeOther}</div>
                 )}
               </div>
-
-              <div>
-                <label htmlFor="clubCategory" className="block text-sm font-medium text-gray-700 mb-2">
-                  Club Category <span className="text-red-500">*</span>
-                </label>
-                <div className="flex space-x-6">
-                  <label className="flex items-center space-x-2">
-                    <Field type="radio" name="clubCategory" value="community" className="accent-orange-500" />
-                    <span>Community-Based Club</span>
-                  </label>
-                  <label className="flex items-center space-x-2">
-                    <Field type="radio" name="clubCategory" value="institute" className="accent-orange-500" />
-                    <span>Institute-Based Club</span>
-                  </label>
-                </div>
-                {currentStep === 1 && errors.clubCategory && touched.clubCategory && (
-                  <div className="mt-1 text-sm text-red-500">{errors.clubCategory}</div>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor="clubType" className="block text-sm font-medium text-gray-700 mb-2">
-                  Club Type <span className="text-red-500">*</span>
-                </label>
-                <Field
-                  as="select"
-                  name="clubType"
-                  id="clubType"
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all duration-200 ${
-                    errors.clubType && touched.clubType
-                      ? 'border-red-500'
-                      : 'border-gray-300 hover:border-orange-300'
-                  }`}
-                >
-                  <option value="">Select Club Type</option>
-                  {clubTypes.map((type) => (
-                    <option key={type.value} value={type.value}>
-                      {type.label}
-                    </option>
-                  ))}
-                </Field>
-                {currentStep === 1 && errors.clubType && touched.clubType && (
-                  <div className="mt-1 text-sm text-red-500">{errors.clubType}</div>
-                )}
-              </div>
-            </div>
-
+            )}
             <div>
+              <label htmlFor="clubCategory" className="block text-sm font-medium text-gray-700 mb-2">
+                <Tooltip content="Is your club community-based or institute-based?">
+                  Club Category <span className="text-red-500">*</span>
+                </Tooltip>
+              </label>
+              <Field
+                as="select"
+                name="clubCategory"
+                id="clubCategory"
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                  errors.clubCategory && touched.clubCategory ? 'border-red-500' : 'border-gray-300 hover:border-orange-300'
+                }`}
+              >
+                <option value="">Select Club Category</option>
+                {clubCategories.map(cat => (
+                  <option key={cat.value} value={cat.value}>{cat.label}</option>
+                ))}
+              </Field>
+              {errors.clubCategory && touched.clubCategory && (
+                <div className="mt-1 text-sm text-red-500">{errors.clubCategory}</div>
+              )}
+            </div>
+            <div>
+              <label htmlFor="founded" className="block text-sm font-medium text-gray-700 mb-2">
+                <Tooltip content="Year of establishment">
+                  Founded <span className="text-red-500">*</span>
+                </Tooltip>
+              </label>
+              <Field
+                type="number"
+                name="founded"
+                id="founded"
+                min={1800}
+                max={new Date().getFullYear()}
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                  errors.founded && touched.founded ? 'border-red-500' : 'border-gray-300 hover:border-orange-300'
+                }`}
+                placeholder="e.g., 2020"
+              />
+              {errors.founded && touched.founded && (
+                <div className="mt-1 text-sm text-red-500">{errors.founded}</div>
+              )}
+            </div>
+          </div>
+        );
+      case 2:
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start min-h-[250px]">
+            <div className="md:col-span-2">
+              <label htmlFor="motto" className="block text-sm font-medium text-gray-700 mb-2">
+                <Tooltip content="A short phrase that captures your club's spirit or values.">
+                  Motto <span className="text-red-500">*</span>
+                </Tooltip>
+              </label>
+              <Field
+                type="text"
+                name="motto"
+                id="motto"
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                  errors.motto && touched.motto ? 'border-red-500' : 'border-gray-300 hover:border-orange-300'
+                }`}
+                placeholder="e.g., Innovate and Inspire"
+              />
+              {errors.motto && touched.motto && (
+                <div className="mt-1 text-sm text-red-500">{errors.motto}</div>
+              )}
+            </div>
+            <div className="md:col-span-2">
               <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-2">
-                Description <span className="text-red-500">*</span>
-                <span className="ml-2 text-xs text-gray-500">(Max 300 characters)</span>
+                <Tooltip content="Describe your club in 100 words or less.">
+                  Description <span className="text-red-500">*</span>
+                </Tooltip>
               </label>
               <Field
                 as="textarea"
                 name="description"
                 id="description"
                 rows={4}
-                maxLength={300}
-                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all duration-200 resize-none ${
-                  errors.description && touched.description
-                    ? 'border-red-500'
-                    : 'border-gray-300 hover:border-orange-300'
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none ${
+                  errors.description && touched.description ? 'border-red-500' : 'border-gray-300 hover:border-orange-300'
                 }`}
-                placeholder="Describe your club's mission, activities, and goals..."
+                placeholder="Describe your club's vision, activities, and goals..."
+                maxLength={1000}
               />
-                             {currentStep === 1 && errors.description && touched.description && (
-                 <div className="text-sm text-red-500">{errors.description}</div>
-               )}
-              <div className="mt-2 flex justify-between">
-                <Field name="description">
-                  {({ field }: { field: any }) => (
-                    <span className="text-xs text-gray-500">
-                      {field.value.length}/300
-                    </span>
-                  )}
-                </Field>
+              <div className="flex justify-between mt-1">
+                <span className="text-xs text-gray-500">
+                  {100 - wordCount(values.description)} words left
+                </span>
+                {errors.description && touched.description && (
+                  <span className="text-xs text-red-500">{errors.description}</span>
+                )}
               </div>
             </div>
-
+            <div className="md:col-span-2">
+              <label htmlFor="mission" className="block text-sm font-medium text-gray-700 mb-2">
+                <Tooltip content="What is your club's mission or main purpose?">
+                  Mission <span className="text-red-500">*</span>
+                </Tooltip>
+              </label>
+              <Field
+                as="textarea"
+                name="mission"
+                id="mission"
+                rows={2}
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 resize-none ${
+                  errors.mission && touched.mission ? 'border-red-500' : 'border-gray-300 hover:border-orange-300'
+                }`}
+                placeholder="What is your club's mission?"
+              />
+              {errors.mission && touched.mission && (
+                <div className="mt-1 text-sm text-red-500">{errors.mission}</div>
+              )}
+            </div>
+          </div>
+        );
+      case 3:
+        return (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start min-h-[250px]">
             <div>
-              <label htmlFor="affiliation" className="block text-sm font-medium text-gray-700 mb-2">
-                University/Organization Affiliation <span className="text-red-500">*</span>
+              <label htmlFor="university" className="block text-sm font-medium text-gray-700 mb-2">
+                University/Institute <span className="text-red-500">*</span>
               </label>
               <Field
                 type="text"
-                name="affiliation"
-                id="affiliation"
-                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all duration-200 ${
-                  errors.affiliation && touched.affiliation
-                    ? 'border-red-500'
-                    : 'border-gray-300 hover:border-orange-300'
+                name="university"
+                id="university"
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                  errors.university && touched.university ? 'border-red-500' : 'border-gray-300 hover:border-orange-300'
                 }`}
                 placeholder="e.g., University of California, Santa Cruz"
               />
-                              {currentStep === 1 && errors.affiliation && touched.affiliation && (
-                  <div className="mt-1 text-sm text-red-500">{errors.affiliation}</div>
-                )}
+              {errors.university && touched.university && (
+                <div className="mt-1 text-sm text-red-500">{errors.university}</div>
+              )}
             </div>
-          </div>
-        );
-
-      case 2:
-        return (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label htmlFor="contactName" className="block text-sm font-medium text-gray-700 mb-2">
-                  Full Name <span className="text-red-500">*</span>
-                </label>
-                <Field
-                  type="text"
-                  name="contactName"
-                  id="contactName"
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all duration-200 ${
-                    errors.contactName && touched.contactName
-                      ? 'border-red-500'
-                      : 'border-gray-300 hover:border-orange-300'
-                  }`}
-                  placeholder="Enter your full name"
-                />
-                {currentStep === 2 && errors.contactName && touched.contactName && (
-                  <div className="mt-1 text-sm text-red-500">{errors.contactName}</div>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor="contactEmail" className="block text-sm font-medium text-gray-700 mb-2">
-                  University Email <span className="text-red-500">*</span>
-                </label>
-                <Field
-                  type="email"
-                  name="contactEmail"
-                  id="contactEmail"
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all duration-200 ${
-                    errors.contactEmail && touched.contactEmail
-                      ? 'border-red-500'
-                      : 'border-gray-300 hover:border-orange-300'
-                  }`}
-                  placeholder="your.email@university.edu"
-                />
-                {currentStep === 2 && errors.contactEmail && touched.contactEmail && (
-                  <div className="mt-1 text-sm text-red-500">{errors.contactEmail}</div>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor="contactPhone" className="block text-sm font-medium text-gray-700 mb-2">
-                  Phone Number <span className="text-red-500">*</span>
-                </label>
-                <Field
-                  type="tel"
-                  name="contactPhone"
-                  id="contactPhone"
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all duration-200 ${
-                    errors.contactPhone && touched.contactPhone
-                      ? 'border-red-500'
-                      : 'border-gray-300 hover:border-orange-300'
-                  }`}
-                  placeholder="1234567890"
-                />
-                {currentStep === 2 && errors.contactPhone && touched.contactPhone && (
-                  <div className="mt-1 text-sm text-red-500">{errors.contactPhone}</div>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor="contactPosition" className="block text-sm font-medium text-gray-700 mb-2">
-                  Designation / Position <span className="text-red-500">*</span>
-                </label>
-                <Field
-                  type="text"
-                  name="contactPosition"
-                  id="contactPosition"
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all duration-200 ${
-                    errors.contactPosition && touched.contactPosition
-                      ? 'border-red-500'
-                      : 'border-gray-300 hover:border-orange-300'
-                  }`}
-                  placeholder="e.g., President, Secretary, etc."
-                />
-                {currentStep === 2 && errors.contactPosition && touched.contactPosition && (
-                  <div className="mt-1 text-sm text-red-500">{errors.contactPosition}</div>
-                )}
-              </div>
-            </div>
-
-                          <FileUpload
-                name="contactIdProof"
-                label="Upload ID Proof"
-                accept=".pdf,.jpg,.jpeg,.png"
-                required={true}
-                setFieldValue={setFieldValue}
-                tooltip="Upload a valid government ID or university ID card for verification"
-                currentStep={currentStep}
-                errors={errors}
-                touched={touched}
+            <div>
+              <label htmlFor="headquarters" className="block text-sm font-medium text-gray-700 mb-2">
+                <Tooltip content="Where is your club based? (e.g., Student Center, Room 101)">
+                  Headquarters <span className="text-red-500">*</span>
+                </Tooltip>
+              </label>
+              <Field
+                type="text"
+                name="headquarters"
+                id="headquarters"
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                  errors.headquarters && touched.headquarters ? 'border-red-500' : 'border-gray-300 hover:border-orange-300'
+                }`}
+                placeholder="e.g., Student Center, Room 101"
               />
+              {errors.headquarters && touched.headquarters && (
+                <div className="mt-1 text-sm text-red-500">{errors.headquarters}</div>
+              )}
+            </div>
+            <div className="md:col-span-2">
+              <label htmlFor="designation" className="block text-sm font-medium text-gray-700 mb-2">
+                <Tooltip content="Your position in the club (e.g., President, Secretary)">
+                  Your Designation <span className="text-red-500">*</span>
+                </Tooltip>
+              </label>
+              <Field
+                type="text"
+                name="designation"
+                id="designation"
+                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 ${
+                  errors.designation && touched.designation ? 'border-red-500' : 'border-gray-300 hover:border-orange-300'
+                }`}
+                placeholder="e.g., President, Secretary"
+              />
+              {errors.designation && touched.designation && (
+                <div className="mt-1 text-sm text-red-500">{errors.designation}</div>
+              )}
+            </div>
           </div>
         );
-
-      case 3:
+      case 4:
         return (
-          <div className="space-y-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-start min-h-[250px]">
+            <div className="md:col-span-2 mb-2">
+              <span className="text-sm text-orange-700 font-semibold">
+                All documents below are <span className="text-red-500">*</span> required. Please upload each file to proceed.
+              </span>
+            </div>
             <FileUpload
-              name="clubConstitution"
+              name="idProofDocument"
+              label="ID Proof Document"
+              accept=".pdf,.jpg,.jpeg,.png"
+              setFieldValue={setFieldValue}
+              tooltip="Upload a valid government or university ID (required)."
+              required={true}
+              errors={errors}
+              touched={touched}
+              currentStep={currentStep}
+              values={values}
+            />
+            <FileUpload
+              name="constitutionDoc"
               label="Club Constitution"
               accept=".pdf,.docx"
               setFieldValue={setFieldValue}
-              tooltip="Upload your club's constitution or bylaws document"
-              currentStep={currentStep}
+              tooltip="Upload your club's constitution or bylaws document (required)."
+              required={true}
               errors={errors}
               touched={touched}
+              currentStep={currentStep}
+              values={values}
             />
-
             <FileUpload
               name="approvalLetter"
               label="Official Approval Letter"
               accept=".pdf,.docx,.jpg,.jpeg,.png"
+              setFieldValue={setFieldValue}
+              tooltip="Upload the official approval letter from your university or organization (required)."
               required={true}
-              setFieldValue={setFieldValue}
-              tooltip="Upload the official approval letter from your university or organization"
-              currentStep={currentStep}
               errors={errors}
               touched={touched}
-            />
-
-            <FileUpload
-              name="meetingMinutes"
-              label="Recent Meeting Minutes"
-              accept=".pdf,.docx"
-              setFieldValue={setFieldValue}
-              tooltip="Upload minutes from your most recent club meeting (optional)"
               currentStep={currentStep}
-              errors={errors}
-              touched={touched}
+              values={values}
             />
-
             <FileUpload
               name="clubLogo"
               label="Club Logo"
               accept=".jpg,.jpeg,.png,.svg"
               setFieldValue={setFieldValue}
-              tooltip="Upload your club's logo or emblem (optional)"
-              currentStep={currentStep}
+              tooltip="Upload your club's logo or emblem (required)."
+              required={true}
               errors={errors}
               touched={touched}
+              currentStep={currentStep}
+              values={values}
             />
           </div>
         );
-
-      case 4:
-        return (
-          <div className="space-y-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div>
-                <label htmlFor="upcomingEvent1" className="block text-sm font-medium text-gray-700 mb-2">
-                  Upcoming Event 1 <span className="text-red-500">*</span>
-                </label>
-                <Field
-                  type="text"
-                  name="upcomingEvent1"
-                  id="upcomingEvent1"
-                  className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all duration-200 ${
-                    errors.upcomingEvent1 && touched.upcomingEvent1
-                      ? 'border-red-500'
-                      : 'border-gray-300 hover:border-orange-300'
-                  }`}
-                  placeholder="Event name & brief description"
-                />
-                {currentStep === 4 && errors.upcomingEvent1 && touched.upcomingEvent1 && (
-                  <div className="mt-1 text-sm text-red-500">{errors.upcomingEvent1}</div>
-                )}
-              </div>
-
-              <div>
-                <label htmlFor="upcomingEvent2" className="block text-sm font-medium text-gray-700 mb-2">
-                  Upcoming Event 2
-                </label>
-                <Field
-                  type="text"
-                  name="upcomingEvent2"
-                  id="upcomingEvent2"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all duration-200 hover:border-orange-300"
-                  placeholder="Event name & brief description"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label htmlFor="expectedMembers" className="block text-sm font-medium text-gray-700 mb-2">
-                Expected Number of Members <span className="text-red-500">*</span>
-              </label>
-              <Field
-                type="number"
-                name="expectedMembers"
-                id="expectedMembers"
-                min="1"
-                className={`w-full px-4 py-3 border rounded-lg focus:outline-none focus:ring-2 focus:ring-orange-500 transition-all duration-200 ${
-                  errors.expectedMembers && touched.expectedMembers
-                    ? 'border-red-500'
-                    : 'border-gray-300 hover:border-orange-300'
-                }`}
-                placeholder="Enter expected member count"
-              />
-                              {currentStep === 4 && errors.expectedMembers && touched.expectedMembers && (
-                  <div className="mt-1 text-sm text-red-500">{errors.expectedMembers}</div>
-                )}
-            </div>
-
-            <div>
-              <span className="block text-sm font-medium text-gray-700 mb-3">
-                Focus Areas <span className="text-red-500">*</span>
-              </span>
-              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-4">
-                {focusAreas.map((area) => (
-                  <div key={area.id} className="flex items-center">
-                    <Field
-                      type="checkbox"
-                      name="focusAreas"
-                      id={`focusArea-${area.id}`}
-                      value={area.id}
-                      className="h-5 w-5 text-orange-500 rounded border-gray-300 focus:ring-orange-500 transition-all duration-200"
-                    />
-                    <label
-                      htmlFor={`focusArea-${area.id}`}
-                      className="ml-3 block text-sm text-gray-700 cursor-pointer hover:text-orange-600 transition-colors"
-                    >
-                      {area.label}
-                    </label>
-                  </div>
-                ))}
-              </div>
-                              {currentStep === 4 && errors.focusAreas && touched.focusAreas && (
-                  <div className="mt-1 text-sm text-red-500">{errors.focusAreas}</div>
-                )}
-            </div>
-          </div>
-        );
-
       case 5:
         return (
-          <div className="space-y-6">
-            <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-              <div className="flex items-start">
-                <Shield className="w-5 h-5 text-orange-600 mt-0.5 mr-3 flex-shrink-0" />
-                <div>
-                  <h3 className="text-sm font-medium text-orange-800 mb-2">Important Information</h3>
-                  <p className="text-sm text-orange-700">
-                    Please review all information carefully before submitting. Once submitted, your club verification request will be reviewed by our team.
-                  </p>
-                </div>
+          <div className="space-y-6 min-h-[120px]">
+            <div className="flex items-start">
+              <input
+                type="checkbox"
+                name="isOfficialRepresentative"
+                id="isOfficialRepresentative"
+                checked={values.isOfficialRepresentative}
+                onChange={e => setFieldValue('isOfficialRepresentative', e.target.checked)}
+                className="h-5 w-5 accent-orange-500 rounded border-gray-300 focus:ring-orange-500 transition-all duration-200"
+              />
+              <div className="ml-3 text-sm">
+                <label htmlFor="isOfficialRepresentative" className="text-gray-700 cursor-pointer hover:text-orange-600 transition-colors">
+                  I confirm that I am an official representative of this club <span className="text-red-500">*</span>
+                </label>
+                {errors.isOfficialRepresentative && touched.isOfficialRepresentative && (
+                  <div className="mt-1 text-sm text-red-500">{errors.isOfficialRepresentative}</div>
+                )}
               </div>
             </div>
-
-            <div className="space-y-4">
-              <div className="flex items-start">
-                <div className="flex items-center h-5">
-                  <Field
-                    type="checkbox"
-                    name="isOfficialRepresentative"
-                    id="isOfficialRepresentative"
-                    className="h-5 w-5 text-orange-500 rounded border-gray-300 focus:ring-orange-500 transition-all duration-200"
-                  />
-                </div>
-                <div className="ml-3 text-sm">
-                  <label htmlFor="isOfficialRepresentative" className="text-gray-700 cursor-pointer hover:text-orange-600 transition-colors">
-                    I confirm that I am an official representative of this club <span className="text-red-500">*</span>
-                  </label>
-                  {currentStep === 5 && errors.isOfficialRepresentative && touched.isOfficialRepresentative && (
-                    <div className="mt-1 text-sm text-red-500">{errors.isOfficialRepresentative}</div>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex items-start">
-                <div className="flex items-center h-5">
-                  <Field
-                    type="checkbox"
-                    name="documentsVerified"
-                    id="documentsVerified"
-                    className="h-5 w-5 text-orange-500 rounded border-gray-300 focus:ring-orange-500 transition-all duration-200"
-                  />
-                </div>
-                <div className="ml-3 text-sm">
-                  <label htmlFor="documentsVerified" className="text-gray-700 cursor-pointer hover:text-orange-600 transition-colors">
-                    All documents are verified by the university/organization <span className="text-red-500">*</span>
-                  </label>
-                  {currentStep === 5 && errors.documentsVerified && touched.documentsVerified && (
-                    <div className="mt-1 text-sm text-red-500">{errors.documentsVerified}</div>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex items-start">
-                <div className="flex items-center h-5">
-                  <Field
-                    type="checkbox"
-                    name="agreeToTerms"
-                    id="agreeToTerms"
-                    className="h-5 w-5 text-orange-500 rounded border-gray-300 focus:ring-orange-500 transition-all duration-200"
-                  />
-                </div>
-                <div className="ml-3 text-sm">
-                  <label htmlFor="agreeToTerms" className="text-gray-700 cursor-pointer hover:text-orange-600 transition-colors">
-                    I agree to the platform's{' '}
-                    <a href="#" className="text-orange-500 hover:text-orange-600 underline transition-colors">
-                      Terms & Conditions
-                    </a>{' '}
-                    <span className="text-red-500">*</span>
-                  </label>
-                  {currentStep === 5 && errors.agreeToTerms && touched.agreeToTerms && (
-                    <div className="mt-1 text-sm text-red-500">{errors.agreeToTerms}</div>
-                  )}
-                </div>
+            <div className="flex items-start">
+              <input
+                type="checkbox"
+                name="documentsVerified"
+                id="documentsVerified"
+                checked={values.documentsVerified}
+                onChange={e => setFieldValue('documentsVerified', e.target.checked)}
+                className="h-5 w-5 accent-orange-500 rounded border-gray-300 focus:ring-orange-500 transition-all duration-200"
+              />
+              <div className="ml-3 text-sm">
+                <label htmlFor="documentsVerified" className="text-gray-700 cursor-pointer hover:text-orange-600 transition-colors">
+                  All documents are verified by the university/organization <span className="text-red-500">*</span>
+                </label>
+                {errors.documentsVerified && touched.documentsVerified && (
+                  <div className="mt-1 text-sm text-red-500">{errors.documentsVerified}</div>
+                )}
               </div>
             </div>
           </div>
         );
-
       default:
         return null;
     }
@@ -878,8 +783,29 @@ export default function ClubVerificationPage() {
         <div className="bg-white rounded-xl shadow-lg p-6 md:p-8">
           <Formik
             initialValues={initialValues}
-            validationSchema={ClubVerificationSchema}
-            onSubmit={handleSubmit}
+            validationSchema={ClubRequestSchema}
+            onSubmit={async (values, { setSubmitting, resetForm }) => {
+              // If clubType is 'other', use clubTypeOther
+              const dataToSend = {
+                ...values,
+                clubType: values.clubType === 'other' ? values.clubType : values.clubType,
+              };
+              console.log('DEBUG: Formik values on submit:', dataToSend);
+              try {
+                const res = await fetch('/api/club-verify', {
+                  method: 'POST',
+                  headers: { 'Content-Type': 'application/json' },
+                  body: JSON.stringify(dataToSend),
+                  credentials: 'include', // Ensure cookies/session are sent
+                });
+                if (!res.ok) throw new Error('Failed to submit club verification');
+                alert('Club verification submitted!');
+                resetForm();
+              } catch (e) {
+                alert('Submission failed. Please try again.');
+              }
+              setSubmitting(false);
+            }}
           >
             {({ errors, touched, isSubmitting, setFieldValue, values, validateForm, setTouched }) => {
               // Helper to validate only current step fields
@@ -899,13 +825,13 @@ export default function ClubVerificationPage() {
                 <Form className="space-y-8">
                   <ProgressStepper currentStep={currentStep} totalSteps={formSteps.length} />
                   <div className="min-h-[400px]">
-                    {renderStepContent(errors, touched, setFieldValue)}
+                    {renderStepContent(values, errors, touched, setFieldValue)}
                   </div>
                   {/* Navigation Buttons */}
                   <div className="flex justify-between pt-6 border-t border-gray-200">
                     <button
                       type="button"
-                      onClick={prevStep}
+                      onClick={() => setCurrentStep(s => Math.max(1, s - 1))}
                       disabled={currentStep === 1}
                       className={`flex items-center space-x-2 px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
                         currentStep === 1
@@ -922,7 +848,7 @@ export default function ClubVerificationPage() {
                         type="button"
                         onClick={async () => {
                           const valid = await validateCurrentStep();
-                          if (valid) nextStep();
+                          if (valid) setCurrentStep(s => s + 1);
                         }}
                         className="flex items-center space-x-2 bg-gradient-to-r from-orange-500 to-red-500 text-white px-6 py-3 rounded-lg font-medium hover:from-orange-600 hover:to-red-600 transition-all duration-200 transform hover:scale-105"
                       >

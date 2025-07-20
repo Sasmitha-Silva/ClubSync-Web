@@ -98,7 +98,15 @@ const handler = NextAuth({
       }
       return true;
     },
-    async session({ session }) {
+    async jwt({ token, user }) {
+      // Add user id to token on sign in
+      if (user && user.id) {
+        token.id = user.id;
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      // Existing logic
       if (session.user?.email) {
         const user = (await prisma.user.findUnique({
           where: { email: session.user.email },
@@ -127,9 +135,14 @@ const handler = NextAuth({
           };
         }
       }
+      // Also add id from token if present (for direct access)
+      if (session.user && token?.id) {
+        session.user.id = token.id as string;
+      }
       return session;
     },
   },
 });
 
 export { handler as GET, handler as POST };
+export const authOptions = handler.options;

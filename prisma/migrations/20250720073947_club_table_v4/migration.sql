@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE "Club" ALTER COLUMN "founded" SET DATA TYPE TEXT;
