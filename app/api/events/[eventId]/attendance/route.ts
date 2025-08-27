@@ -48,20 +48,34 @@ export async function POST(req: Request, context: { params: Promise<{ eventId: s
   const { userId } = body;
 
   try {
-    const attendance = await prisma.eventAttendance.upsert({
-      where: { userId_eventId: { userId, eventId } },
-      update: { isAttend: true, attendTime: new Date() },
-      create: {
-        userId,
-        eventId,
-        isAttend: true,
-        attendTime: new Date(),
-      },
-    });
+    const existing = await prisma.eventAttendance.findFirst({
+  where: { userId, eventId },
+});
+if (existing && existing.isAttend) {
+      // Already attended → don’t update again
+      return NextResponse.json({
+        success: false,
+        message: "Attendance already marked",
+        attendance: existing,
+      });
+    }
+let attendance;
+
+if (existing) {
+  attendance = await prisma.eventAttendance.update({
+    where: { id: existing.id },
+    data: { isAttend: true, attendTime: new Date() },
+  });
+} else {
+  attendance = await prisma.eventAttendance.create({
+    data: { userId, eventId, isAttend: true, attendTime: new Date() },
+  });
+}
+
 
     return NextResponse.json({ success: true, attendance });
   } catch (err) {
     console.error("Attendance mark error:", err);
-    return NextResponse.json({ success: false, message: "Failed to mark attendance" }, { status: 500 });
+    return NextResponse.json({ success: false,  }, { status: 500 });
   }
 }
