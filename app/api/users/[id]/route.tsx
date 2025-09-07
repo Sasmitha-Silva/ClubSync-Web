@@ -38,7 +38,7 @@ export async function GET(
   }
 }
 
-// PUT /api/users/[electionId] - Update user
+// PUT /api/users/[userId] - Update user
 export async function PUT(
   request: NextRequest,
   { params }: { params: { id: string } },
