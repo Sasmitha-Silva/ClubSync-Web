@@ -18,5 +18,6 @@ export interface ClubFormData {
     values: string[];
     avenues: string[];
     about: string;
+    mission?: string; // Optional mission field
   };
 }

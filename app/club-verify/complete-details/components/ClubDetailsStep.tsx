@@ -53,6 +53,16 @@ export default function ClubDetailsStep({ formData, setFormData }: Props) {
     });
   };
 
+  const handleMissionChange = (event: React.ChangeEvent<HTMLTextAreaElement>) => {
+    setFormData({
+      ...formData,
+      details: {
+        ...formData.details,
+        mission: event.target.value,
+      },
+    });
+  };
+
   const removeValue = (value: string) => {
     setFormData({
       ...formData,
@@ -153,10 +163,27 @@ export default function ClubDetailsStep({ formData, setFormData }: Props) {
               <Type className="w-5 h-5 text-gray-400" />
             </div>
             <textarea
-              placeholder="Tell us about your club's mission, vision, and goals..."
+              placeholder="Tell us about your club's history and overview..."
               value={formData.details.about}
               onChange={handleAboutChange}
-              rows={6}
+              rows={4}
+              className="block w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-300 resize-none"
+            />
+          </div>
+        </div>
+
+        {/* Mission */}
+        <div className="space-y-2">
+          <label className="block text-sm font-medium text-gray-700">Club Mission</label>
+          <div className="relative">
+            <div className="absolute top-3 left-3 pointer-events-none">
+              <Type className="w-5 h-5 text-gray-400" />
+            </div>
+            <textarea
+              placeholder="Describe your club's mission, vision, and goals..."
+              value={formData.details.mission || ""}
+              onChange={handleMissionChange}
+              rows={4}
               className="block w-full pl-12 pr-4 py-3 border-2 border-gray-200 rounded-lg focus:ring-2 focus:ring-orange-500 focus:border-orange-500 transition-all duration-300 resize-none"
             />
           </div>
