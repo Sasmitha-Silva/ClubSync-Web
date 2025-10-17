@@ -4,7 +4,7 @@ import { prisma } from "@/prisma/client";
 // GET - Fetch a single event
 export async function GET(
   request: NextRequest,
-  context: { params: Promise<{ eventId: string }> }
+  context: { params: Promise<{ eventId: string }> },
 ) {
   try {
     const params = await context.params;
@@ -13,32 +13,70 @@ export async function GET(
     const event = await prisma.event.findUnique({
       where: {
         id: eventId,
-        isDeleted: false
+        isDeleted: false,
       },
       include: {
-        club: true,
+        club: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         registrations: {
           select: {
-            id: true
-          }
-        }
-      }
+            id: true,
+          },
+        },
+        addons: true,
+        agenda: {
+          orderBy: {
+            startTime: "asc",
+          },
+        },
+        resourcePersons: true,
+      },
     });
 
     if (!event) {
-      return NextResponse.json(
-        { error: "Event not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
-    return NextResponse.json({ event });
+    // Transform to match frontend Event interface
+    const transformedEvent = {
+      id: event.id,
+      title: event.title,
+      subtitle: event.subtitle,
+      description: event.description,
+      date: event.startDateTime.toISOString().split("T")[0],
+      time: event.startDateTime.toTimeString().slice(0, 5),
+      location: event.venue,
+      venue: event.venue,
+      coverImage: event.addons?.[0]?.tags?.[0] || null, // Adjust based on your schema
+      category: event.category,
+      maxCapacity: event.maxParticipants,
+      registeredCount: event.registrations.length,
+      isActive: new Date(event.startDateTime) > new Date(),
+      isPaid: false, // Add to schema if needed
+      price: 0, // Add to schema if needed
+      organizer: {
+        id: event.club.id,
+        name: event.club.name,
+        type: "club" as const,
+      },
+      createdAt: event.createdAt.toISOString(),
+      updatedAt: event.updatedAt.toISOString(),
+      // Additional data if needed
+      agenda: event.agenda,
+      resourcePersons: event.resourcePersons,
+      addons: event.addons,
+    };
 
+    return NextResponse.json(transformedEvent);
   } catch (error) {
     console.error("Error fetching event:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -46,13 +84,13 @@ export async function GET(
 // PUT - Update an event
 export async function PUT(
   request: NextRequest,
-  context: { params: Promise<{ eventId: string }> }
+  context: { params: Promise<{ eventId: string }> },
 ) {
   try {
     const params = await context.params;
     const { eventId } = params;
     const body = await request.json();
-    
+
     const {
       title,
       subtitle,
@@ -62,27 +100,24 @@ export async function PUT(
       endDateTime,
       venue,
       eventOrganizerId,
-      maxParticipants
+      maxParticipants,
     } = body;
 
     // Validate required fields
     if (!title || !startDateTime) {
       return NextResponse.json(
         { error: "Missing required fields" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
     // Verify the event exists
     const existingEvent = await prisma.event.findUnique({
-      where: { id: eventId }
+      where: { id: eventId },
     });
 
     if (!existingEvent) {
-      return NextResponse.json(
-        { error: "Event not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
     // Update the event using raw SQL
@@ -108,25 +143,24 @@ export async function PUT(
         club: true,
         registrations: {
           select: {
-            id: true
-          }
-        }
-      }
+            id: true,
+          },
+        },
+      },
     });
 
     return NextResponse.json({
       message: "Event updated successfully",
-      event: updatedEvent
+      event: updatedEvent,
     });
-
   } catch (error) {
     console.error("Error updating event:", error);
     return NextResponse.json(
-      { 
+      {
         error: "Internal server error",
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -134,7 +168,7 @@ export async function PUT(
 // DELETE - Soft delete an event
 export async function DELETE(
   request: NextRequest,
-  context: { params: Promise<{ eventId: string }> }
+  context: { params: Promise<{ eventId: string }> },
 ) {
   try {
     const params = await context.params;
@@ -142,14 +176,11 @@ export async function DELETE(
 
     // Verify the event exists
     const existingEvent = await prisma.event.findUnique({
-      where: { id: eventId }
+      where: { id: eventId },
     });
 
     if (!existingEvent) {
-      return NextResponse.json(
-        { error: "Event not found" },
-        { status: 404 }
-      );
+      return NextResponse.json({ error: "Event not found" }, { status: 404 });
     }
 
     // Soft delete the event
@@ -162,14 +193,13 @@ export async function DELETE(
     `;
 
     return NextResponse.json({
-      message: "Event deleted successfully"
+      message: "Event deleted successfully",
     });
-
   } catch (error) {
     console.error("Error deleting event:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

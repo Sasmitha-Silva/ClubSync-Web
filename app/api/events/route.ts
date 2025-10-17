@@ -15,14 +15,14 @@ export async function POST(request: NextRequest) {
       endDateTime,
       venue,
       eventOrganizerId,
-      maxParticipants
+      maxParticipants,
     } = body;
 
     // Validate required fields
     if (!title || !clubId || !startDateTime) {
       return NextResponse.json(
         { error: "Missing required fields" },
-        { status: 400 }
+        { status: 400 },
       );
     }
 
@@ -36,13 +36,13 @@ export async function POST(request: NextRequest) {
       endDateTime,
       venue,
       eventOrganizerId,
-      maxParticipants
+      maxParticipants,
     });
 
     // Create the event
     // Create the event using raw SQL to bypass Prisma client issues
     const eventId = `evt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    
+
     await prisma.$executeRaw`
       INSERT INTO events (
         id, title, subtitle, "clubId", category, description, 
@@ -69,27 +69,26 @@ export async function POST(request: NextRequest) {
     const event = await prisma.event.findUnique({
       where: { id: eventId },
       include: {
-        club: true
-      }
+        club: true,
+      },
     });
 
     return NextResponse.json({
       message: "Event created successfully",
-      event
+      event,
     });
-
   } catch (error) {
     console.error("Error creating event:", error);
     console.error("Error details:", {
-      message: error instanceof Error ? error.message : 'Unknown error',
-      stack: error instanceof Error ? error.stack : 'No stack trace',
+      message: error instanceof Error ? error.message : "Unknown error",
+      stack: error instanceof Error ? error.stack : "No stack trace",
     });
     return NextResponse.json(
-      { 
+      {
         error: "Internal server error",
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: error instanceof Error ? error.message : "Unknown error",
       },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }
@@ -99,38 +98,64 @@ export async function GET(request: NextRequest) {
     const { searchParams } = new URL(request.url);
     const clubId = searchParams.get("clubId");
 
-    if (!clubId) {
-      return NextResponse.json(
-        { error: "Club ID is required" },
-        { status: 400 }
-      );
-    }
+    // Build the where clause conditionally
+    const whereClause = {
+      isDeleted: false,
+      ...(clubId && { clubId }), // Only add clubId filter if it exists
+    };
 
-    // Get events for the club
+    // Get events (either filtered by club or all events)
     const events = await prisma.event.findMany({
-      where: {
-        clubId,
-        isDeleted: false
-      },
+      where: whereClause,
       include: {
+        club: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
         registrations: {
           select: {
-            id: true
-          }
-        }
+            id: true,
+          },
+        },
       },
       orderBy: {
-        startDateTime: "desc"
-      }
+        startDateTime: "desc",
+      },
     });
 
-    return NextResponse.json({ events });
+    // Transform the data to match the Event interface expected by the frontend
+    const transformedEvents = events.map((event) => ({
+      id: event.id,
+      title: event.title,
+      description: event.description,
+      date: event.startDateTime.toISOString().split("T")[0],
+      time: event.startDateTime.toTimeString().slice(0, 5),
+      location: event.venue,
+      venue: event.venue,
+      coverImage: event.coverImage,
+      category: event.category,
+      maxCapacity: event.maxParticipants,
+      registeredCount: event.registrations.length,
+      isActive: new Date(event.startDateTime) > new Date(),
+      isPaid: false, // Add this field to your schema if needed
+      price: 0, // Add this field to your schema if needed
+      organizer: {
+        id: event.club.id,
+        name: event.club.name,
+        type: "club" as const,
+      },
+      createdAt: event.createdAt.toISOString(),
+      updatedAt: event.updatedAt.toISOString(),
+    }));
 
+    return NextResponse.json(transformedEvents);
   } catch (error) {
     console.error("Error fetching events:", error);
     return NextResponse.json(
       { error: "Internal server error" },
-      { status: 500 }
+      { status: 500 },
     );
   }
 }

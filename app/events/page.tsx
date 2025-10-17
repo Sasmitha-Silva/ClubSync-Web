@@ -42,145 +42,6 @@ interface Event {
   updatedAt: string;
 }
 
-// Mock data until database is ready
-const mockEvents: Event[] = [
-  {
-    id: "1",
-    title: "Annual Tech Conference 2025",
-    description:
-      "Join us for the biggest tech conference of the year featuring industry leaders and innovative technologies.",
-    date: "2025-08-15",
-    time: "09:00",
-    location: "Main Auditorium",
-    venue: "University Campus",
-    category: "Conference",
-    maxCapacity: 500,
-    registeredCount: 342,
-    isActive: true,
-    isPaid: true,
-    price: 25,
-    organizer: {
-      id: "tech-club",
-      name: "Tech Innovation Club",
-      type: "club",
-    },
-    createdAt: "2025-07-01T00:00:00Z",
-    updatedAt: "2025-07-15T00:00:00Z",
-  },
-  {
-    id: "2",
-    title: "Community Service Day",
-    description:
-      "Make a difference in our community! Join us for a day of volunteering and giving back.",
-    date: "2025-07-25",
-    time: "08:00",
-    location: "Community Center",
-    venue: "Downtown Community Hub",
-    category: "Volunteer",
-    maxCapacity: 100,
-    registeredCount: 78,
-    isActive: true,
-    isPaid: false,
-    organizer: {
-      id: "volunteer-club",
-      name: "Volunteer Society",
-      type: "club",
-    },
-    createdAt: "2025-07-05T00:00:00Z",
-    updatedAt: "2025-07-18T00:00:00Z",
-  },
-  {
-    id: "3",
-    title: "Photography Workshop",
-    description:
-      "Learn the art of photography from professional photographers. Bring your camera and creativity!",
-    date: "2025-08-02",
-    time: "14:00",
-    location: "Art Studio",
-    venue: "Creative Arts Building",
-    category: "Workshop",
-    maxCapacity: 30,
-    registeredCount: 25,
-    isActive: true,
-    isPaid: true,
-    price: 15,
-    organizer: {
-      id: "photo-club",
-      name: "Photography Club",
-      type: "club",
-    },
-    createdAt: "2025-06-20T00:00:00Z",
-    updatedAt: "2025-07-10T00:00:00Z",
-  },
-  {
-    id: "4",
-    title: "Cultural Night 2025",
-    description:
-      "Celebrate diversity with performances, food, and cultural exchanges from around the world.",
-    date: "2025-09-10",
-    time: "18:00",
-    location: "Student Union",
-    venue: "Grand Ballroom",
-    category: "Cultural",
-    maxCapacity: 300,
-    registeredCount: 156,
-    isActive: true,
-    isPaid: false,
-    organizer: {
-      id: "cultural-club",
-      name: "International Cultural Society",
-      type: "club",
-    },
-    createdAt: "2025-06-15T00:00:00Z",
-    updatedAt: "2025-07-12T00:00:00Z",
-  },
-  {
-    id: "5",
-    title: "Business Networking Mixer",
-    description:
-      "Connect with professionals, entrepreneurs, and fellow students in a relaxed networking environment.",
-    date: "2025-08-20",
-    time: "17:30",
-    location: "Business Center",
-    venue: "Executive Lounge",
-    category: "Networking",
-    maxCapacity: 80,
-    registeredCount: 45,
-    isActive: true,
-    isPaid: true,
-    price: 20,
-    organizer: {
-      id: "business-club",
-      name: "Business Students Association",
-      type: "club",
-    },
-    createdAt: "2025-07-02T00:00:00Z",
-    updatedAt: "2025-07-16T00:00:00Z",
-  },
-  {
-    id: "6",
-    title: "Sports Tournament - Basketball",
-    description:
-      "Annual basketball tournament open to all skill levels. Form your team and compete for the championship!",
-    date: "2025-07-30",
-    time: "10:00",
-    location: "Sports Complex",
-    venue: "Main Court",
-    category: "Sports",
-    maxCapacity: 16,
-    registeredCount: 12,
-    isActive: false,
-    isPaid: false,
-    organizer: {
-      id: "sports-club",
-      name: "Athletic Association",
-      type: "club",
-    },
-    createdAt: "2025-06-10T00:00:00Z",
-    updatedAt: "2025-07-20T00:00:00Z",
-  },
-];
-
 export default function EventsPage() {
   const [events, setEvents] = useState<Event[]>([]);
   const [filteredEvents, setFilteredEvents] = useState<Event[]>([]);
@@ -192,15 +53,18 @@ export default function EventsPage() {
   const eventsPerPage = 12;
 
   useEffect(() => {
-    // Simulate API call with mock data
     const fetchEvents = async () => {
       try {
         setLoading(true);
-        // Simulate loading delay
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        const response = await fetch("/api/events");
 
-        setEvents(mockEvents);
-        setFilteredEvents(mockEvents);
+        if (!response.ok) {
+          throw new Error("Failed to fetch events");
+        }
+
+        const eventsData = await response.json();
+        setEvents(eventsData);
+        setFilteredEvents(eventsData);
       } catch (err) {
         setError(err instanceof Error ? err.message : "An error occurred");
       } finally {
@@ -617,4 +481,3 @@ export default function EventsPage() {
     </div>
   );
 }
-export { mockEvents };

@@ -28,6 +28,7 @@ import {
   Linkedin,
   Twitter,
 } from "lucide-react";
+import { useParams } from "next/navigation";
 
 interface Club {
   id: string;
@@ -90,6 +91,8 @@ interface Club {
 }
 
 export default function ClubPage() {
+  const params = useParams();
+  const clubId = params.id as string;
   const [isEditing, setIsEditing] = useState(false);
   const [activeTab, setActiveTab] = useState("overview");
   const [isAdmin, setIsAdmin] = useState(false);
@@ -97,8 +100,6 @@ export default function ClubPage() {
   const [club, setClub] = useState<Club | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const clubId = "1"; // You can make this dynamic based on route params
 
   useEffect(() => {
     const fetchClubData = async () => {
@@ -176,7 +177,7 @@ export default function ClubPage() {
 
   if (loading) {
     return (
-      <BeautifulLoader 
+      <BeautifulLoader
         message="Loading Club Details"
         subMessage="Getting the latest information..."
         type="morphing"
@@ -194,7 +195,9 @@ export default function ClubPage() {
           <h3 className="text-2xl font-bold text-gray-800 mb-4">
             Oops! Something went wrong
           </h3>
-          <p className="text-red-600 text-lg mb-6">{error || "Club not found"}</p>
+          <p className="text-red-600 text-lg mb-6">
+            {error || "Club not found"}
+          </p>
           <button
             onClick={() => window.location.reload()}
             className="bg-gradient-to-r from-orange-500 to-red-500 text-white px-8 py-3 rounded-full hover:from-orange-600 hover:to-red-600 transition-all duration-300 transform hover:scale-105 shadow-lg"
