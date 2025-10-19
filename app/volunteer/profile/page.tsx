@@ -8,50 +8,23 @@ import {
   Award,
   Calendar,
   Edit3,
-  Download,
   Badge,
-  MapPin,
   IdCard,
   Clock,
   CheckCircle,
   X,
-  FileText,
   Star,
   Camera,
-  Settings,
   Briefcase,
-  TrendingUp,
   BookOpen,
-  Users,
   Shield,
   Target,
-  Activity,
 } from "lucide-react";
+import { uploadToCloudinary } from "@/utils/uploadToCloudinary";
 
-interface Certificate {
-  title: string;
-  eventName?: string;
-  dateAwarded: string;
-  url: string;
-}
-
-interface EventHistory {
-  title: string;
-  date: string;
-  status: "completed" | "upcoming" | "cancelled";
-  attendanceMarked: boolean;
-}
-
-interface ServiceLetter {
-  id: string;
-  requestedDate: string;
-  status: "pending" | "approved" | "rejected";
-  downloadUrl?: string;
-}
 
 export default function VolunteerProfile() {
   const [isEditing, setIsEditing] = useState(false);
-  const [activeTab, setActiveTab] = useState("activity");
   const { data: session } = useSession();
   
   const [user, setUser] = useState({
@@ -59,65 +32,17 @@ export default function VolunteerProfile() {
     email: "Loading...", // This will be fetched from database
     universityId: "2022IS066",
     mobile: "Loading...", // This will be fetched from database
-    role: "Senior Volunteer",
-    department: "Computer Science",
-    profilePicture: null,
+    role: "Volunteer",
+    profilePicture: null as string | null,
     rewardPoints: 320,
     level: "Silver",
-    joinedDate: "2024-01-15",
+    joinedDate: null as string | null,
     totalEvents: 15,
     completedEvents: 12,
     upcomingEvents: 3,
-    certificates: [
-      { 
-        title: "Leadership Workshop Certificate", 
-        eventName: "Leadership Development Program 2024",
-        dateAwarded: "2024-10-15",
-        url: "#",
-        issuer: "UCSC Leadership Center"
-      },
-      { 
-        title: "Event Volunteer Certificate", 
-        eventName: "TechFest 2024",
-        dateAwarded: "2024-10-12",
-        url: "#",
-        issuer: "Technical Society"
-      },
-      { 
-        title: "Community Service Certificate", 
-        eventName: "Community Clean-up Drive",
-        dateAwarded: "2024-06-15",
-        url: "#",
-        issuer: "Environmental Club"
-      },
-      { 
-        title: "Blood Donation Certificate", 
-        eventName: "Blood Donation Camp",
-        dateAwarded: "2024-06-01",
-        url: "#",
-        issuer: "Health Services"
-      },
-    ],
-    eventHistory: [
-      { title: "TechFest 2024", date: "2024-10-12", status: "completed" as const, attendanceMarked: true },
-      { title: "Green Club Meetup", date: "2024-08-05", status: "completed" as const, attendanceMarked: true },
-      { title: "Community Clean-up Drive", date: "2024-06-15", status: "completed" as const, attendanceMarked: true },
-      { title: "Food Distribution Program", date: "2024-06-01", status: "completed" as const, attendanceMarked: false },
-      { title: "Winter Carnival 2025", date: "2025-01-15", status: "upcoming" as const, attendanceMarked: false },
-    ],
-    serviceLetters: [
-      {
-        id: "1",
-        requestedDate: "2024-11-01",
-        status: "approved" as const,
-        downloadUrl: "#"
-      },
-      {
-        id: "2", 
-        requestedDate: "2024-12-15",
-        status: "pending" as const
-      }
-    ]
+    certificates: [],
+    eventHistory: [],
+    serviceLetters: []
   });
 
   const [editData, setEditData] = useState({
@@ -136,11 +61,16 @@ export default function VolunteerProfile() {
           if (response.ok) {
             const userData = await response.json();
             const fullName = `${userData.firstName} ${userData.lastName}`;
+            // prefer camelCase createdAt, fallback to snake_case created_at
+            const createdAt = userData.createdAt ?? userData.created_at ?? null;
             setUser(prevUser => ({
               ...prevUser,
               name: fullName,
               email: userData.email,
-              mobile: userData.phone
+              mobile: userData.phone,
+              joinedDate: createdAt,
+              // prefer image from DB, fallback to session image if available
+              profilePicture: userData.image ?? session?.user?.image ?? null,
             }));
             setEditData(prevEditData => ({
               ...prevEditData,
@@ -163,6 +93,40 @@ export default function VolunteerProfile() {
 
     fetchUserData();
   }, [session?.user?.id]);
+
+  // File input ref behavior: we'll use a hidden input to pick files
+  const fileInputId = "profile-image-input";
+  const [isUploading, setIsUploading] = useState(false);
+
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !session?.user?.id) return;
+
+    try {
+      setIsUploading(true);
+      // Upload to Cloudinary
+      const uploadedUrl = await uploadToCloudinary(file as File);
+
+      // Persist to DB
+      const res = await fetch(`/api/users/${session.user.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ image: uploadedUrl }),
+      });
+
+      if (!res.ok) throw new Error("Failed to save profile image");
+
+      // Update local state
+      setUser((prev) => ({ ...prev, profilePicture: uploadedUrl }));
+    } catch (err) {
+      console.error("Image upload error:", err);
+    } finally {
+      setIsUploading(false);
+      // reset input value so same file can be selected again if needed
+      const input = document.getElementById(fileInputId) as HTMLInputElement | null;
+      if (input) input.value = "";
+    }
+  };
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
@@ -227,24 +191,9 @@ export default function VolunteerProfile() {
     setIsEditing(false);
   };
 
-  const tabs = [
-    { id: "activity", label: "Activity", icon: <Activity className="w-5 h-5" /> },
-    { id: "certificates", label: "Certifications", icon: <Award className="w-5 h-5" /> },
-    { id: "events", label: "Event History", icon: <Calendar className="w-5 h-5" /> },
-    { id: "documents", label: "Documents", icon: <FileText className="w-5 h-5" /> },
-  ];
+  // Tabs removed per request.
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case "completed": return "bg-gray-100 text-gray-700 border-gray-300";
-      case "upcoming": return "bg-gray-50 text-gray-600 border-gray-200";
-      case "cancelled": return "bg-gray-100 text-gray-500 border-gray-300";
-      case "approved": return "bg-gray-100 text-gray-700 border-gray-300";
-      case "pending": return "bg-gray-50 text-gray-600 border-gray-200";
-      case "rejected": return "bg-gray-100 text-gray-500 border-gray-300";
-      default: return "bg-gray-100 text-gray-600 border-gray-200";
-    }
-  };
+  // Status color helper removed (no longer needed after removing status-driven UIs)
 
   const getLevelBadge = (level: string) => {
     switch (level) {
@@ -278,9 +227,20 @@ export default function VolunteerProfile() {
                       <User className="w-16 h-16 text-gray-400" />
                     )}
                   </div>
-                  <button className="absolute bottom-2 right-2 w-8 h-8 bg-gray-600 hover:bg-gray-700 rounded-full flex items-center justify-center text-white transition-colors">
-                    <Camera className="w-4 h-4" />
+                  <button
+                    onClick={() => document.getElementById(fileInputId)?.click()}
+                    className="absolute bottom-2 right-2 w-8 h-8 bg-gray-600 hover:bg-gray-700 rounded-full flex items-center justify-center text-white transition-colors"
+                    title={isUploading ? "Uploading..." : "Change profile image"}
+                    disabled={isUploading}
+                  >
+                    {isUploading ? (
+                      <svg className="animate-spin w-4 h-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"></path></svg>
+                    ) : (
+                      <Camera className="w-4 h-4" />
+                    )}
                   </button>
+                  {/* Hidden file input */}
+                  <input id={fileInputId} type="file" accept="image/*" onChange={handleFileChange} className="hidden" />
                 </div>
                 
                 {/* Level Badge */}
@@ -299,13 +259,10 @@ export default function VolunteerProfile() {
                       <Briefcase className="w-4 h-4" />
                       {user.role}
                     </span>
-                    <span className="flex items-center gap-2">
-                      <BookOpen className="w-4 h-4" />
-                      {user.department}
-                    </span>
+                    {/* department removed from UI per request */}
                     <span className="flex items-center gap-2">
                       <Calendar className="w-4 h-4" />
-                      Joined {new Date(user.joinedDate).toLocaleDateString()}
+                      Joined {user.joinedDate ? new Date(user.joinedDate).toLocaleDateString() : "—"}
                     </span>
                   </div>
                 </div>
@@ -392,27 +349,7 @@ export default function VolunteerProfile() {
           </div>
         </div>
 
-        {/* Professional Navigation Tabs */}
-        <div className="bg-white rounded-xl shadow-sm border border-gray-200 mb-8">
-          <div className="p-2">
-            <div className="flex flex-wrap gap-1">
-              {tabs.map((tab) => (
-                <button
-                  key={tab.id}
-                  onClick={() => setActiveTab(tab.id)}
-                  className={`flex items-center gap-3 px-6 py-3 rounded-lg font-medium transition-all duration-200 ${
-                    activeTab === tab.id
-                      ? "bg-orange-500 text-white shadow-sm"
-                      : "text-gray-600 hover:text-gray-900 hover:bg-gray-50"
-                  }`}
-                >
-                  {tab.icon}
-                  <span className="hidden sm:block">{tab.label}</span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
+        {/* Tabs removed */}
 
         {/* Content Sections */}
         {/* Edit Profile Popup Modal */}
@@ -492,169 +429,7 @@ export default function VolunteerProfile() {
           </div>
         )}
 
-        {activeTab === "activity" && (
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6">Recent Activity</h2>
-            <div className="space-y-4">
-              {[
-                { action: "Completed TechFest 2024 event", date: "2 days ago", type: "event" },
-                { action: "Received Leadership Certificate", date: "1 week ago", type: "certificate" },
-                { action: "Joined Community Clean-up Drive", date: "2 weeks ago", type: "event" },
-                { action: "Profile updated", date: "3 weeks ago", type: "profile" },
-              ].map((activity, index) => (
-                <div key={index} className="flex items-center gap-4 p-4 bg-gray-50 rounded-lg">
-                  <div className="w-10 h-10 bg-gray-200 rounded-full flex items-center justify-center">
-                    {activity.type === "event" && <Calendar className="w-5 h-5 text-gray-600" />}
-                    {activity.type === "certificate" && <Award className="w-5 h-5 text-gray-600" />}
-                    {activity.type === "profile" && <User className="w-5 h-5 text-gray-600" />}
-                  </div>
-                  <div className="flex-1">
-                    <p className="font-medium text-gray-900">{activity.action}</p>
-                    <p className="text-sm text-gray-600">{activity.date}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Certificates Tab */}
-        {activeTab === "certificates" && (
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-8">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">Professional Certifications</h2>
-              <span className="px-4 py-2 bg-gray-100 text-gray-700 rounded-full text-sm font-medium">
-                {user.certificates.length} Certificates
-              </span>
-            </div>
-            
-            <div className="grid md:grid-cols-2 gap-6">
-              {user.certificates.map((certificate, index) => (
-                <div key={index} className="border border-gray-200 rounded-xl p-6 hover:shadow-md transition-shadow">
-                  <div className="flex items-start justify-between mb-4">
-                    <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
-                      <Award className="w-6 h-6 text-gray-600" />
-                    </div>
-                    <button className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors text-sm">
-                      <Download className="w-4 h-4" />
-                      Download
-                    </button>
-                  </div>
-                  
-                  <h3 className="font-bold text-gray-900 mb-2">{certificate.title}</h3>
-                  {certificate.eventName && (
-                    <p className="text-sm text-gray-600 mb-2">{certificate.eventName}</p>
-                  )}
-                  <div className="flex items-center justify-between text-xs text-gray-500">
-                    <span>Issued by {certificate.issuer}</span>
-                    <span>{new Date(certificate.dateAwarded).toLocaleDateString()}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Event History Tab */}
-        {activeTab === "events" && (
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-8">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">Event Participation History</h2>
-              <span className="px-4 py-2 bg-gray-100 text-gray-700 rounded-full text-sm font-medium">
-                {user.eventHistory.length} Events
-              </span>
-            </div>
-            
-            <div className="space-y-4">
-              {user.eventHistory.map((event, index) => (
-                <div key={index} className="flex items-center justify-between p-6 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
-                      <Calendar className="w-6 h-6 text-gray-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-gray-900">{event.title}</h3>
-                      <p className="text-sm text-gray-600">{new Date(event.date).toLocaleDateString()}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-4">
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(event.status)}`}>
-                      {event.status.charAt(0).toUpperCase() + event.status.slice(1)}
-                    </span>
-                    
-                    <div className="flex items-center gap-2">
-                      {event.attendanceMarked ? (
-                        <div className="flex items-center gap-1 text-gray-600">
-                          <CheckCircle className="w-4 h-4" />
-                          <span className="text-sm font-medium">Attended</span>
-                        </div>
-                      ) : (
-                        <div className="flex items-center gap-1 text-gray-400">
-                          <X className="w-4 h-4" />
-                          <span className="text-sm">No Record</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
-
-        {/* Documents Tab */}
-        {activeTab === "documents" && (
-          <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-8">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-2xl font-bold text-gray-900">Document Requests</h2>
-              <button className="flex items-center gap-2 px-4 py-2 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors">
-                <FileText className="w-4 h-4" />
-                Request Document
-              </button>
-            </div>
-            
-            <div className="space-y-4">
-              {user.serviceLetters.map((letter) => (
-                <div key={letter.id} className="flex items-center justify-between p-6 border border-gray-200 rounded-xl hover:bg-gray-50 transition-colors">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center">
-                      <FileText className="w-6 h-6 text-gray-600" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-gray-900">Service Letter Request</h3>
-                      <p className="text-sm text-gray-600">Requested on {new Date(letter.requestedDate).toLocaleDateString()}</p>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center gap-4">
-                    <span className={`px-3 py-1 rounded-full text-sm font-medium border ${getStatusColor(letter.status)}`}>
-                      {letter.status.charAt(0).toUpperCase() + letter.status.slice(1)}
-                    </span>
-                    
-                    {letter.status === "approved" && letter.downloadUrl && (
-                      <button className="flex items-center gap-2 text-gray-600 hover:text-gray-900 transition-colors">
-                        <Download className="w-4 h-4" />
-                        <span className="text-sm font-medium">Download</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-              ))}
-              
-              {user.serviceLetters.length === 0 && (
-                <div className="text-center py-12">
-                  <FileText className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-                  <h3 className="text-lg font-medium text-gray-900 mb-2">No Document Requests</h3>
-                  <p className="text-gray-600 mb-4">You haven't requested any documents yet.</p>
-                  <button className="px-6 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors">
-                    Request Your First Document
-                  </button>
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+        {/* Tab content removed per request */}
       </div>
     </div>
   );

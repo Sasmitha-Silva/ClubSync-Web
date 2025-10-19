@@ -6,6 +6,7 @@ const nextConfig: NextConfig = {
       "lh3.googleusercontent.com",
       "api.dicebear.com",
       "images.unsplash.com",
+      "res.cloudinary.com",
     ],
   },
   experimental: {

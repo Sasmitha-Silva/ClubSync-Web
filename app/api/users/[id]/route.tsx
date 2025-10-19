@@ -47,7 +47,7 @@ export async function PUT(
   try {
     const { id } = await params;
     const body: UpdateUserRequest = await request.json();
-    const { firstName, lastName, email, phone, password } =
+    const { firstName, lastName, email, phone, password, image } =
       updateUserSchema.parse(body);
 
     // Check if user exists
@@ -65,6 +65,7 @@ export async function PUT(
     if (lastName) updateData.lastName = lastName;
     if (email) updateData.email = email;
     if (phone) updateData.phone = phone;
+  if (image) updateData.image = image;
     if (password) updateData.password = await bcrypt.hash(password, 12);
 
     // Update user
@@ -75,6 +76,7 @@ export async function PUT(
         id: true,
         firstName: true,
         lastName: true,
+        image: true,
         email: true,
         phone: true,
         createdAt: true,
