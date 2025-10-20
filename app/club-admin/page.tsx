@@ -51,6 +51,9 @@ export default function ClubAdminDashboard() {
   const [clubs, setClubs] = useState<Club[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [recentFeedback, setRecentFeedback] = useState<Array<any>>([]);
+  const [feedbackLoading, setFeedbackLoading] = useState(false);
+  const [feedbackError, setFeedbackError] = useState<string | null>(null);
 
   async function fetchClubs() {
     if (!session?.user?.id) return;
@@ -76,6 +79,27 @@ export default function ClubAdminDashboard() {
     fetchClubs();
   }, [session?.user?.id]);
 
+  useEffect(() => {
+    // fetch latest feedbacks for admin dashboard
+    const fetchRecentFeedbacks = async () => {
+      setFeedbackLoading(true);
+      setFeedbackError(null);
+      try {
+        const res = await fetch(`/api/feedbacks?limit=5`, { cache: "no-store" });
+        const data = await res.json();
+        if (!res.ok) throw new Error(data?.error || "Failed to fetch feedbacks");
+        setRecentFeedback(data);
+      } catch (err) {
+        setRecentFeedback([]);
+        setFeedbackError(err instanceof Error ? err.message : String(err));
+      } finally {
+        setFeedbackLoading(false);
+      }
+    };
+
+    fetchRecentFeedbacks();
+  }, []);
+
   // Reset inquiry modal state when opened
   useEffect(() => {
     if (showInquiryModal) {
@@ -85,35 +109,7 @@ export default function ClubAdminDashboard() {
     }
   }, [showInquiryModal]);
 
-  // Mocked feedback data
-  const recentFeedback = [
-    {
-      id: 1,
-      volunteerName: "Sarah Johnson",
-      club: "Robotics Club",
-      rating: 5,
-      comment:
-        "Amazing experience! The club activities are well-organized and engaging.",
-      date: "2024-01-15",
-    },
-    {
-      id: 2,
-      volunteerName: "Mike Chen",
-      club: "Drama Club",
-      rating: 4,
-      comment:
-        "Great leadership and communication. Would love to see more events.",
-      date: "2024-01-14",
-    },
-    {
-      id: 3,
-      volunteerName: "Emily Davis",
-      club: "Environmental Club",
-      rating: 5,
-      comment: "Excellent initiative and dedication to environmental causes.",
-      date: "2024-01-13",
-    },
-  ];
+  
 
   const getStatusColor = (status: string) => {
     switch (status.toLowerCase()) {
