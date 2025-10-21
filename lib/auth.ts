@@ -99,9 +99,22 @@ export const authOptions: NextAuthOptions = {
               password: "", // No password for social accounts
               image: user.image || randomAvatar() || "",
               emailVerified: true,
+              lastLogin: new Date(),
             },
           });
+        } else {
+          // Update lastLogin for existing user
+          await prisma.user.update({
+            where: { email: user.email! },
+            data: { lastLogin: new Date() },
+          });
         }
+      } else if (account?.provider === "credentials") {
+        // Update lastLogin for credentials sign-in
+        await prisma.user.update({
+          where: { email: user.email! },
+          data: { lastLogin: new Date() },
+        });
       }
       return true;
     },

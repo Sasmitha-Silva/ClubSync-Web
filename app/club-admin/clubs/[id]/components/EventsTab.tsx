@@ -180,7 +180,7 @@ const EventsTab: React.FC = () => {
 
       const data = await response.json();
       showToast(
-        `Generated ${data.generated.length} certificates successfully!`,
+        `Generated ${data.generated.length} certificate(s) successfully!`,
         'success'
       );
     } catch (err) {

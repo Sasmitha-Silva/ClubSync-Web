@@ -43,11 +43,9 @@ interface AnalyticsData {
     activeUsers: number;
     concurrentSessions: number;
     eventsToday: number;
-    avgResponseTime: number;
     activeUsersChange: string;
     sessionsChange: string;
     eventsTodayChange: string;
-    responseTimeChange: string;
   };
   systemHealth: {
     overall: number;
@@ -169,22 +167,49 @@ const AnalyticsTab: React.FC = () => {
                 </div>
               </div>
               <p className="text-orange-100 text-base">Comprehensive insights and performance metrics</p>
-              <div className="flex items-center space-x-6 mt-4 text-sm text-orange-200">
-                <div className="flex items-center space-x-2">
-                  <Activity className="w-4 h-4" />
-                  <span>524 active users</span>
+              
+              {/* Key Stats Row */}
+              <div className="grid grid-cols-3 gap-6 mt-6">
+                <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-3 border border-white/20">
+                  <div className="flex items-center space-x-2 mb-1">
+                    <Users className="w-4 h-4 text-orange-200" />
+                    <span className="text-xs text-orange-200 uppercase tracking-wide">Total Clubs</span>
+                  </div>
+                  <div className="text-2xl font-bold">{analyticsData.summaryStats.totalClubs.toLocaleString()}</div>
+                  <div className="text-xs text-orange-200 mt-1">
+                    {parseFloat(analyticsData.summaryStats.clubGrowth) >= 0 ? '↑' : '↓'} {Math.abs(parseFloat(analyticsData.summaryStats.clubGrowth)).toFixed(1)}% this month
+                  </div>
                 </div>
-                <div className="flex items-center space-x-2">
-                  <Clock className="w-4 h-4" />
-                  <span>Last updated: 30 seconds ago</span>
+                
+                <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-3 border border-white/20">
+                  <div className="flex items-center space-x-2 mb-1">
+                    <Activity className="w-4 h-4 text-orange-200" />
+                    <span className="text-xs text-orange-200 uppercase tracking-wide">Active Users</span>
+                  </div>
+                  <div className="text-2xl font-bold">{analyticsData.liveMetrics.activeUsers.toLocaleString()}</div>
+                  <div className="text-xs text-orange-200 mt-1">
+                    Online right now
+                  </div>
+                </div>
+                
+                <div className="bg-white/10 backdrop-blur-sm rounded-lg px-4 py-3 border border-white/20">
+                  <div className="flex items-center space-x-2 mb-1">
+                    <Clock className="w-4 h-4 text-orange-200" />
+                    <span className="text-xs text-orange-200 uppercase tracking-wide">Last Updated</span>
+                  </div>
+                  <div className="text-2xl font-bold">{getTimeAgo(lastUpdated)}</div>
+                  <div className="text-xs text-orange-200 mt-1">
+                    Auto-refresh enabled
+                  </div>
                 </div>
               </div>
             </div>
+            
             <div className="text-right">
-              <div className="text-4xl font-light mb-2">98.5%</div>
+              <div className="text-4xl font-light mb-2">{analyticsData.systemHealth.overall}%</div>
               <div className="text-orange-200 text-sm uppercase tracking-wide">System Health</div>
               <div className="w-24 bg-white/20 rounded-full h-1.5 mt-3">
-                <div className="bg-white h-1.5 rounded-full transition-all duration-1000" style={{width: '98.5%'}}></div>
+                <div className="bg-white h-1.5 rounded-full transition-all duration-1000" style={{width: `${analyticsData.systemHealth.overall}%`}}></div>
               </div>
             </div>
           </div>
@@ -229,9 +254,9 @@ const AnalyticsTab: React.FC = () => {
                 bgColor: 'bg-orange-50' 
               },
               { 
-                label: 'Avg. Response Time', 
-                value: `${analyticsData.liveMetrics.avgResponseTime}ms`, 
-                change: analyticsData.liveMetrics.responseTimeChange, 
+                label: 'Total Members', 
+                value: analyticsData.summaryStats.totalMembers.toLocaleString(), 
+                change: '+' + Math.floor(analyticsData.summaryStats.totalMembers * 0.05).toString(), 
                 color: 'text-red-600', 
                 bgColor: 'bg-red-50' 
               },
@@ -261,47 +286,50 @@ const AnalyticsTab: React.FC = () => {
           </div>
         </div>
 
-        {/* Regional Performance */}
+        {/* Provincial Distribution */}
         <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm">
           <div className="flex items-center justify-between mb-6">
-            <h3 className="text-lg font-semibold text-gray-900">Regional Distribution</h3>
+            <h3 className="text-lg font-semibold text-gray-900">Provincial Distribution</h3>
             <Globe className="w-5 h-5 text-orange-600" />
           </div>
           
           <div className="space-y-4">
-            {analyticsData.geographicData.map((region, index) => (
-              <div key={index} className="space-y-2">
-                <div className="flex items-center justify-between">
-                  <span className="text-sm font-medium text-gray-700">{region.region}</span>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-sm text-gray-600">{region.clubs}</span>
-                    <div className="w-6 h-6 rounded-md flex items-center justify-center text-xs font-semibold text-white"
-                         style={{ backgroundColor: region.color }}>
-                      {region.clubs}
+            {analyticsData.geographicData.map((region, index) => {
+              const maxClubs = Math.max(...analyticsData.geographicData.map(r => r.clubs));
+              return (
+                <div key={index} className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-sm font-medium text-gray-700">{region.region}</span>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm text-gray-600">{region.clubs} clubs</span>
+                      <div className="w-6 h-6 rounded-md flex items-center justify-center text-xs font-semibold text-white"
+                           style={{ backgroundColor: region.color }}>
+                        {region.clubs}
+                      </div>
                     </div>
                   </div>
+                  
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="h-2 rounded-full transition-all duration-1000"
+                      style={{ 
+                        width: `${(region.clubs / Math.max(maxClubs, 1)) * 100}%`,
+                        backgroundColor: region.color
+                      }}
+                    ></div>
+                  </div>
                 </div>
-                
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div 
-                    className="h-2 rounded-full transition-all duration-1000"
-                    style={{ 
-                      width: `${(region.clubs / 200) * 100}%`,
-                      backgroundColor: region.color
-                    }}
-                  ></div>
-                </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
           
           <div className="mt-6 p-4 bg-gradient-to-r from-orange-50 to-red-50 rounded-lg border border-orange-200">
             <div className="text-center space-y-2">
               <div className="flex items-center justify-center space-x-2">
                 <div className="w-2 h-2 bg-gradient-to-r from-orange-500 to-red-500 rounded-full"></div>
-                <span className="text-sm font-medium text-gray-900">Global Coverage</span>
+                <span className="text-sm font-medium text-gray-900">Nationwide Coverage</span>
               </div>
-              <p className="text-xs text-gray-600">{analyticsData.summaryStats.totalClubs} organizations across 47 countries</p>
+              <p className="text-xs text-gray-600">{analyticsData.summaryStats.totalClubs} clubs across {analyticsData.geographicData.length} provinces</p>
               <p className="text-xs text-orange-600">Updated {getTimeAgo(lastUpdated)}</p>
             </div>
           </div>

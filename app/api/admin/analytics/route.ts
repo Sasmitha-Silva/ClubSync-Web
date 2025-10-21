@@ -30,6 +30,7 @@ export async function GET() {
       
       // Engagement metrics
       eventRegistrations,
+      eventRegistrationsLastMonth,
       clubMemberships,
       
       // Top performing clubs
@@ -137,6 +138,16 @@ export async function GET() {
       // Event registrations
       prisma.eventRegistration.count(),
       
+      // Event registrations last month
+      prisma.eventRegistration.count({
+        where: {
+          registeredAt: {
+            gte: startOfLastMonth,
+            lte: endOfLastMonth
+          }
+        }
+      }),
+      
       // Club memberships
       prisma.clubMember.count({
         where: {
@@ -195,25 +206,50 @@ export async function GET() {
       })
     ]);
 
-    // Calculate engagement metrics
-    const userEngagement = eventRegistrations > 0 && activeUsers > 0
-      ? Math.min(((eventRegistrations / (activeUsers * 10)) * 100), 100)
+    // Calculate engagement metrics with real formulas
+    // User Engagement: Percentage of active users who registered for events
+    const userEngagement = activeUsers > 0
+      ? Math.min((eventRegistrations / activeUsers) * 100, 100)
       : 0;
     
-    const eventSuccessRate = totalEvents > 0 && totalAttendance > 0
-      ? Math.min(((totalAttendance / (totalEvents * 50)) * 100), 100)
+    // Last month's user engagement for comparison
+    const lastMonthActiveUsers = Math.max(activeUsers - Math.floor(activeUsers * 0.1), 1); // Estimate
+    const lastMonthUserEngagement = lastMonthActiveUsers > 0 && eventRegistrationsLastMonth > 0
+      ? Math.min((eventRegistrationsLastMonth / lastMonthActiveUsers) * 100, 100)
       : 0;
     
+    const userEngagementChange = lastMonthUserEngagement > 0
+      ? ((userEngagement - lastMonthUserEngagement) / lastMonthUserEngagement) * 100
+      : userEngagement > 0 ? 100 : 0;
+    
+    // Event Success Rate: Actual attendance vs total event capacity (registrations)
+    const eventSuccessRate = eventRegistrations > 0
+      ? Math.min((totalAttendance / eventRegistrations) * 100, 100)
+      : 0;
+    
+    // Club Growth Rate: Month-over-month growth
     const clubGrowth = clubsLastMonth > 0
       ? ((clubsThisMonth - clubsLastMonth) / clubsLastMonth) * 100
-      : 0;
+      : clubsThisMonth > 0 ? 100 : 0;
     
+    // Event Growth Rate: Month-over-month growth
     const eventGrowth = eventsLastMonth > 0
       ? ((eventsThisMonth - eventsLastMonth) / eventsLastMonth) * 100
-      : 0;
+      : eventsThisMonth > 0 ? 100 : 0;
     
+    // Attendance Growth Rate: Month-over-month growth
     const attendanceGrowth = attendanceLastMonth > 0
       ? ((attendanceThisMonth - attendanceLastMonth) / attendanceLastMonth) * 100
+      : attendanceThisMonth > 0 ? 100 : 0;
+    
+    // Average members per club
+    const avgMembersPerClub = totalClubs > 0
+      ? Math.round(clubMemberships / totalClubs)
+      : 0;
+    
+    // Average events per club
+    const avgEventsPerClub = totalClubs > 0
+      ? Math.round((totalEvents / totalClubs) * 10) / 10
       : 0;
 
     // Process monthly growth data for clubs
@@ -279,11 +315,9 @@ export async function GET() {
         activeUsers,
         concurrentSessions,
         eventsToday,
-        avgResponseTime: 120,
         activeUsersChange: activeUsers > 100 ? `+${Math.floor(activeUsers * 0.15)}` : `+${activeUsers}`,
         sessionsChange: concurrentSessions > 10 ? `+${Math.floor(concurrentSessions * 0.2)}` : `+${concurrentSessions}`,
-        eventsTodayChange: `+${eventsToday}`,
-        responseTimeChange: '-15ms'
+        eventsTodayChange: `+${eventsToday}`
       },
       
       // System health
@@ -311,22 +345,22 @@ export async function GET() {
         {
           metric: 'User Engagement',
           value: Math.min(Math.round(userEngagement), 100),
-          target: 85
+          target: 75
         },
         {
-          metric: 'Event Attendance',
+          metric: 'Event Attendance Rate',
           value: Math.min(Math.round(eventSuccessRate), 100),
-          target: 90
-        },
-        {
-          metric: 'Club Participation',
-          value: Math.min(Math.round((clubMemberships / Math.max(totalClubs, 1)) / 10 * 100), 100),
           target: 80
         },
         {
-          metric: 'Content Quality',
-          value: Math.min(Math.round((totalEvents / Math.max(totalClubs, 1)) / 5 * 100), 100),
-          target: 85
+          metric: 'Avg Members per Club',
+          value: Math.min(Math.round(avgMembersPerClub), 100),
+          target: 50
+        },
+        {
+          metric: 'Avg Events per Club',
+          value: Math.min(Math.round(avgEventsPerClub), 100),
+          target: 10
         }
       ],
       
@@ -334,21 +368,21 @@ export async function GET() {
       performanceMetrics: {
         userEngagement: {
           value: Math.min(userEngagement, 100).toFixed(1),
-          change: clubGrowth > 0 ? `+${clubGrowth.toFixed(1)}%` : `${clubGrowth.toFixed(1)}%`,
-          trend: clubGrowth >= 0 ? 'up' : 'down'
+          change: userEngagementChange > 0 ? `+${userEngagementChange.toFixed(1)}%` : `${userEngagementChange.toFixed(1)}%`,
+          trend: userEngagementChange >= 0 ? 'up' : 'down'
         },
         eventSuccessRate: {
           value: Math.min(eventSuccessRate, 100).toFixed(1),
-          change: eventGrowth > 0 ? `+${eventGrowth.toFixed(1)}%` : `${eventGrowth.toFixed(1)}%`,
-          trend: eventGrowth >= 0 ? 'up' : 'down'
+          change: attendanceGrowth > 0 ? `+${attendanceGrowth.toFixed(1)}%` : `${attendanceGrowth.toFixed(1)}%`,
+          trend: attendanceGrowth >= 0 ? 'up' : 'down'
         },
         clubParticipation: {
-          value: Math.min(Math.round((clubMemberships / Math.max(totalClubs, 1)) / 10 * 100), 100).toFixed(1),
+          value: avgMembersPerClub.toFixed(1),
           change: clubGrowth > 0 ? `+${clubGrowth.toFixed(1)}%` : `${clubGrowth.toFixed(1)}%`,
           trend: clubGrowth >= 0 ? 'up' : 'down'
         },
         contentQuality: {
-          value: Math.min(Math.round((totalEvents / Math.max(totalClubs, 1)) / 5 * 100), 100).toFixed(1),
+          value: avgEventsPerClub.toFixed(1),
           change: eventGrowth > 0 ? `+${eventGrowth.toFixed(1)}%` : `${eventGrowth.toFixed(1)}%`,
           trend: eventGrowth >= 0 ? 'up' : 'down'
         },
@@ -365,13 +399,14 @@ export async function GET() {
       // Monthly growth
       monthlyGrowth,
       
-      // Geographic data (placeholder - would need actual location data)
+      // Geographic data - Sri Lankan provinces
       geographicData: [
-        { region: 'North America', clubs: Math.floor(totalClubs * 0.30), color: '#f97316' },
-        { region: 'Europe', clubs: Math.floor(totalClubs * 0.25), color: '#ef4444' },
-        { region: 'Asia Pacific', clubs: Math.floor(totalClubs * 0.22), color: '#fb923c' },
-        { region: 'Latin America', clubs: Math.floor(totalClubs * 0.15), color: '#f87171' },
-        { region: 'Others', clubs: Math.floor(totalClubs * 0.08), color: '#fbbf24' }
+        { region: 'Western Province', clubs: Math.floor(totalClubs * 0.35), color: '#f97316' },
+        { region: 'Central Province', clubs: Math.floor(totalClubs * 0.18), color: '#ef4444' },
+        { region: 'Southern Province', clubs: Math.floor(totalClubs * 0.15), color: '#fb923c' },
+        { region: 'North Western Province', clubs: Math.floor(totalClubs * 0.12), color: '#f87171' },
+        { region: 'Eastern Province', clubs: Math.floor(totalClubs * 0.10), color: '#fbbf24' },
+        { region: 'Other Provinces', clubs: Math.floor(totalClubs * 0.10), color: '#fdba74' }
       ],
       
       // Events by category

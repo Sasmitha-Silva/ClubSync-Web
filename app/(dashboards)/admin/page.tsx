@@ -10,7 +10,6 @@ import {
   Award,
   TrendingUp,
   Settings,
-  Search,
   Activity,
   UserCheck,
   BarChart3,
@@ -327,7 +326,6 @@ const AdminDashboardContent = () => {
               <h1 className="text-xl font-bold bg-gradient-to-r from-orange-600 to-red-600 bg-clip-text text-transparent">
                 ClubSync
               </h1>
-              <p className="text-xs text-gray-500 font-medium">Admin Portal</p>
             </div>
           </div>
         </div>
@@ -377,16 +375,9 @@ const AdminDashboardContent = () => {
         {/* Top Bar */}
         <header className="bg-white border-b border-gray-200 px-6 py-4">
           <div className="flex items-center justify-between">
-            {/* Search Bar */}
-            <div className="flex-1 max-w-2xl">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-                <input
-                  type="text"
-                  placeholder="Search clubs, events, users..."
-                  className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-orange-500 focus:border-transparent transition-all duration-200 bg-gray-50 hover:bg-white"
-                />
-              </div>
+            {/* Admin Portal Header */}
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900">Admin Portal</h1>
             </div>
 
             {/* Live Stats Pills */}
